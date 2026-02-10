@@ -83,25 +83,31 @@ func ProcessTurn(ctx context.Context, opts ProcessTurnOptions) error {
 			}
 
 			// Add assistant response to history
-			opts.OnMessage(provider.Message{
+			assistantMsg := provider.Message{
 				Role:    "assistant",
 				Content: resp.Content,
-			})
+			}
+			opts.OnMessage(assistantMsg)
+			opts.History = append(opts.History, assistantMsg)
 
 			return nil
 		}
 
 		// Tool calls present - add assistant message with tool calls to history
-		opts.OnMessage(provider.Message{
+		assistantMsg := provider.Message{
 			Role:      "assistant",
 			Content:   resp.Content,
 			ToolCalls: resp.ToolCalls,
-		})
+		}
+		opts.OnMessage(assistantMsg)
+		opts.History = append(opts.History, assistantMsg)
 
-		// Execute each tool call
-		if err := executeToolCalls(ctx, opts.Proxy, resp.ToolCalls, opts.OnMessage); err != nil {
+		// Execute each tool call and update history
+		toolResults, err := executeToolCalls(ctx, opts.Proxy, resp.ToolCalls, opts.OnMessage)
+		if err != nil {
 			return err
 		}
+		opts.History = append(opts.History, toolResults...)
 
 		// Continue loop to let LLM process tool results
 	}
@@ -124,7 +130,10 @@ func displayReasoning(reasoning string) {
 }
 
 // executeToolCalls executes a list of tool calls and adds results to history.
-func executeToolCalls(ctx context.Context, proxy *mcp.Proxy, toolCalls []provider.ToolCall, onMessage MessageCallback) error {
+// Returns the list of tool result messages that were added.
+func executeToolCalls(ctx context.Context, proxy *mcp.Proxy, toolCalls []provider.ToolCall, onMessage MessageCallback) ([]provider.Message, error) {
+	var toolResults []provider.Message
+
 	for _, toolCall := range toolCalls {
 		fmt.Print(styles.Secondary.Render(fmt.Sprintf("⚙ %s", toolCall.Name)))
 
@@ -139,11 +148,13 @@ func executeToolCalls(ctx context.Context, proxy *mcp.Proxy, toolCalls []provide
 			fmt.Println(styles.Error.Render("  Error: " + err.Error()))
 
 			// Add error result to history
-			onMessage(provider.Message{
+			toolMsg := provider.Message{
 				Role:       "tool",
 				Content:    fmt.Sprintf("Error: %v", err),
 				ToolCallID: toolCall.ID,
-			})
+			}
+			onMessage(toolMsg)
+			toolResults = append(toolResults, toolMsg)
 			continue
 		}
 
@@ -156,11 +167,13 @@ func executeToolCalls(ctx context.Context, proxy *mcp.Proxy, toolCalls []provide
 			}
 
 			// Add error result to history
-			onMessage(provider.Message{
+			toolMsg := provider.Message{
 				Role:       "tool",
 				Content:    errText,
 				ToolCallID: toolCall.ID,
-			})
+			}
+			onMessage(toolMsg)
+			toolResults = append(toolResults, toolMsg)
 			continue
 		}
 
@@ -172,14 +185,16 @@ func executeToolCalls(ctx context.Context, proxy *mcp.Proxy, toolCalls []provide
 		displayToolResult(resultText)
 
 		// Add tool result to history
-		onMessage(provider.Message{
+		toolMsg := provider.Message{
 			Role:       "tool",
 			Content:    resultText,
 			ToolCallID: toolCall.ID,
-		})
+		}
+		onMessage(toolMsg)
+		toolResults = append(toolResults, toolMsg)
 	}
 
-	return nil
+	return toolResults, nil
 }
 
 // displayToolArguments shows tool arguments in a truncated format.
