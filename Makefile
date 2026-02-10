@@ -27,5 +27,3 @@ test:
 
 clean:
 	rm -rf bin/ coverage.out
-
-

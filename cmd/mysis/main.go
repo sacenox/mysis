@@ -15,6 +15,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/xonecas/mysis/internal/config"
+	"github.com/xonecas/mysis/internal/constants"
 	"github.com/xonecas/mysis/internal/mcp"
 	"github.com/xonecas/mysis/internal/provider"
 	"github.com/xonecas/mysis/internal/store"
@@ -635,7 +636,10 @@ func (app *App) handleAutoplayCommand(ctx context.Context, input string) error {
 	app.mu.Unlock()
 
 	fmt.Println(styles.Secondary.Render(fmt.Sprintf("Autoplay started: \"%s\"", message)))
-	fmt.Println(styles.Muted.Render("Interval: 200s (20 tool rounds × 10s/tick)"))
+	fmt.Println(styles.Muted.Render(fmt.Sprintf("Interval: %ds (%d avg tool calls × %ds/tick)",
+		int(constants.AutoplayInterval.Seconds()),
+		constants.AvgToolCallsPerTurn,
+		int(constants.GameTickDuration.Seconds()))))
 	fmt.Println(styles.Muted.Render("Type '/autoplay stop' to stop"))
 
 	// Start autoplay loop in background
@@ -644,12 +648,9 @@ func (app *App) handleAutoplayCommand(ctx context.Context, input string) error {
 	return nil
 }
 
-// runAutoplay sends the autoplay message every 200 seconds (20 tool rounds × 10s/tick)
+// runAutoplay sends the autoplay message at intervals based on expected tool call duration.
 func (app *App) runAutoplay(ctx context.Context) {
 	log.Debug().Msg("Autoplay goroutine started")
-
-	// maxToolRounds (20) × game tick time (10s) = 200 seconds
-	const autoplayInterval = 200 * time.Second
 
 	defer func() {
 		app.mu.Lock()
@@ -669,7 +670,7 @@ func (app *App) runAutoplay(ctx context.Context) {
 	log.Debug().Msg("First autoplay message sent successfully")
 
 	// Then wait and send subsequent messages
-	ticker := time.NewTicker(autoplayInterval)
+	ticker := time.NewTicker(constants.AutoplayInterval)
 	defer ticker.Stop()
 
 	for {

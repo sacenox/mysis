@@ -15,4 +15,15 @@ const (
 const (
 	// DefaultTimeout is the default timeout for operations.
 	DefaultTimeout = 30 * time.Second
+
+	// GameTickDuration is the SpaceMolt game server tick duration.
+	GameTickDuration = 10 * time.Second
+
+	// AvgToolCallsPerTurn is the expected average tool calls per turn for autoplay timing.
+	// Database analysis shows actual average is ~3, but we use 10 for safety margin.
+	AvgToolCallsPerTurn = 10
+
+	// AutoplayInterval is the interval between autoplay turns.
+	// Calculated as: AvgToolCallsPerTurn × GameTickDuration
+	AutoplayInterval = AvgToolCallsPerTurn * GameTickDuration
 )
