@@ -20,6 +20,7 @@ type Flags struct {
 	ListSessions  bool
 	DeleteSession string
 	Autoplay      string
+	SystemFile    string
 }
 
 // ParseFlags parses command-line flags and returns the result.
@@ -44,6 +45,8 @@ func ParseFlags(version string) *Flags {
 	flag.StringVar(&f.DeleteSession, "D", "", "Delete a session by name (shorthand)")
 	flag.StringVar(&f.Autoplay, "autoplay", "", "Start autoplay immediately with given message")
 	flag.StringVar(&f.Autoplay, "a", "", "Start autoplay immediately (shorthand)")
+	flag.StringVar(&f.SystemFile, "file", "", "Load system prompt from markdown file")
+	flag.StringVar(&f.SystemFile, "f", "", "Load system prompt from markdown file (shorthand)")
 
 	flag.Usage = func() {
 		printHelp(version)
@@ -95,6 +98,7 @@ func printHelp(version string) {
 	fmt.Println("  " + styles.Secondary.Render("-p, --provider") + " NAME     Provider name (overrides config default)")
 	fmt.Println("  " + styles.Secondary.Render("-s, --session") + " NAME      Session name (resume or create)")
 	fmt.Println("  " + styles.Secondary.Render("-a, --autoplay") + " MSG      Start autoplay immediately with message")
+	fmt.Println("  " + styles.Secondary.Render("-f, --file") + " PATH      Load system prompt from markdown file")
 	fmt.Println("  " + styles.Secondary.Render("-l, --list-sessions") + "     List recent sessions and exit")
 	fmt.Println("  " + styles.Secondary.Render("-D, --delete-session") + " N  Delete session by name and exit")
 	fmt.Println()

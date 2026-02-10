@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -169,6 +170,17 @@ func Run(version string) error {
 	history, err := sessionMgr.LoadHistory(sessionID)
 	if err != nil {
 		return err
+	}
+
+	// Load system prompt from markdown file if provided
+	if flags.SystemFile != "" {
+		systemPrompt, err := loadSystemPromptFromFile(flags.SystemFile)
+		if err != nil {
+			return err
+		}
+		if !historyHasSystemPrompt(history, systemPrompt) {
+			history = prependSystemPrompt(history, systemPrompt)
+		}
 	}
 
 	// Print welcome message
@@ -391,4 +403,37 @@ func initializeProviders(cfg *config.Config, creds *config.Credentials) *provide
 	}
 
 	return registry
+}
+
+func loadSystemPromptFromFile(path string) (string, error) {
+	ext := strings.ToLower(filepath.Ext(path))
+	if ext != ".md" && ext != ".markdown" {
+		return "", fmt.Errorf("system prompt file must be markdown (.md or .markdown): %s", path)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("read system prompt file: %w", err)
+	}
+
+	content := strings.TrimSpace(string(data))
+	if content == "" {
+		return "", fmt.Errorf("system prompt file is empty: %s", path)
+	}
+
+	return content, nil
+}
+
+func historyHasSystemPrompt(history []provider.Message, content string) bool {
+	for _, msg := range history {
+		if msg.Role == "system" && msg.Content == content {
+			return true
+		}
+	}
+	return false
+}
+
+func prependSystemPrompt(history []provider.Message, content string) []provider.Message {
+	systemMsg := provider.Message{Role: "system", Content: content}
+	return append([]provider.Message{systemMsg}, history...)
 }
