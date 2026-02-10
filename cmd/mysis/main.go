@@ -295,6 +295,23 @@ func (app *App) processTurn(ctx context.Context) error {
 	maxToolRounds := 20 // Prevent infinite loops
 
 	for round := 0; round < maxToolRounds; round++ {
+		// Compress history before sending to LLM
+		// Keep last 10 turns full, compress older state queries
+		compressedHistory := store.CompressHistory(app.history, 10)
+
+		// Log compression stats
+		if len(compressedHistory) < len(app.history) {
+			originalTokens := store.EstimateTokenCount(app.history)
+			compressedTokens := store.EstimateTokenCount(compressedHistory)
+			log.Debug().
+				Int("original_msgs", len(app.history)).
+				Int("compressed_msgs", len(compressedHistory)).
+				Int("original_tokens", originalTokens).
+				Int("compressed_tokens", compressedTokens).
+				Int("saved_tokens", originalTokens-compressedTokens).
+				Msg("History compressed")
+		}
+
 		// Convert MCP tools to provider format
 		providerTools := make([]provider.Tool, len(app.tools))
 		for i, t := range app.tools {
@@ -305,8 +322,8 @@ func (app *App) processTurn(ctx context.Context) error {
 			}
 		}
 
-		// Call LLM with tools
-		resp, err := app.provider.ChatWithTools(ctx, app.history, providerTools)
+		// Call LLM with compressed history
+		resp, err := app.provider.ChatWithTools(ctx, compressedHistory, providerTools)
 		if err != nil {
 			return fmt.Errorf("LLM call failed: %w", err)
 		}
