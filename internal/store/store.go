@@ -48,7 +48,7 @@ func Open() (*Store, error) {
 	}
 
 	dbPath := filepath.Join(dataDir, "mysis.db")
-	db, err := sql.Open("sqlite3", dbPath+"?_journal_mode=WAL")
+	db, err := sql.Open("sqlite3", dbPath+"?_journal_mode=WAL&_foreign_keys=1")
 	if err != nil {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
@@ -89,6 +89,15 @@ func (s *Store) initSchema() error {
 			tool_calls TEXT,
 			reasoning TEXT,
 			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+		);
+
+		CREATE TABLE IF NOT EXISTS session_credentials (
+			session_id TEXT PRIMARY KEY,
+			username TEXT NOT NULL,
+			password TEXT NOT NULL,
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
 		);
 
@@ -321,4 +330,34 @@ func (s *Store) DeleteSessionByName(name string) error {
 	}
 
 	return nil
+}
+
+// SaveCredentials stores game credentials for a session.
+func (s *Store) SaveCredentials(sessionID, username, password string) error {
+	query := `
+		INSERT INTO session_credentials (session_id, username, password, created_at, updated_at)
+		VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+		ON CONFLICT(session_id) DO UPDATE SET
+			username = excluded.username,
+			password = excluded.password,
+			updated_at = CURRENT_TIMESTAMP
+	`
+	_, err := s.db.Exec(query, sessionID, username, password)
+	if err != nil {
+		return fmt.Errorf("save credentials: %w", err)
+	}
+	return nil
+}
+
+// GetCredentials retrieves game credentials for a session.
+func (s *Store) GetCredentials(sessionID string) (username, password string, err error) {
+	query := `SELECT username, password FROM session_credentials WHERE session_id = ?`
+	err = s.db.QueryRow(query, sessionID).Scan(&username, &password)
+	if err == sql.ErrNoRows {
+		return "", "", nil
+	}
+	if err != nil {
+		return "", "", fmt.Errorf("get credentials: %w", err)
+	}
+	return username, password, nil
 }
