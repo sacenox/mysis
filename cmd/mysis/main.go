@@ -195,28 +195,63 @@ func main() {
 	// Initialize provider registry
 	registry := initializeProviders(cfg, creds)
 
-	// Select provider
-	selectedProvider := providerName
-	if selectedProvider == "" {
-		// Use first provider from config
-		for name := range cfg.Providers {
-			selectedProvider = name
-			break
+	// Determine provider and model - check if resuming session first
+	var selectedProvider string
+	var selectedModel string
+
+	// Check if we're resuming a session to use its provider
+	if sessionName != "" && providerName == "" {
+		sess, err := db.GetSessionByName(sessionName)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, styles.Error.Render("Failed to check session: "+err.Error()))
+			os.Exit(1)
+		}
+		if sess != nil {
+			// Resuming existing session - use its provider
+			selectedProvider = sess.Provider
+			selectedModel = sess.Model
+			log.Debug().
+				Str("session", sessionName).
+				Str("provider", selectedProvider).
+				Str("model", selectedModel).
+				Msg("Using provider from existing session")
 		}
 	}
 
+	// If provider not determined from session, use flag or default
 	if selectedProvider == "" {
-		fmt.Fprintln(os.Stderr, styles.Error.Render("Error: no provider configured"))
-		os.Exit(1)
+		selectedProvider = providerName
+		if selectedProvider == "" {
+			// Use default provider from config (first one)
+			for name := range cfg.Providers {
+				selectedProvider = name
+				break
+			}
+		}
+
+		if selectedProvider == "" {
+			fmt.Fprintln(os.Stderr, styles.Error.Render("Error: no provider configured"))
+			os.Exit(1)
+		}
+
+		// Get model from config
+		providerCfg, ok := cfg.Providers[selectedProvider]
+		if !ok {
+			fmt.Fprintln(os.Stderr, styles.Error.Render(fmt.Sprintf("Error: provider '%s' not found in config", selectedProvider)))
+			os.Exit(1)
+		}
+		selectedModel = providerCfg.Model
 	}
 
+	// Verify provider exists in config
 	providerCfg, ok := cfg.Providers[selectedProvider]
 	if !ok {
 		fmt.Fprintln(os.Stderr, styles.Error.Render(fmt.Sprintf("Error: provider '%s' not found in config", selectedProvider)))
 		os.Exit(1)
 	}
 
-	prov, err := registry.Create(selectedProvider, providerCfg.Model, providerCfg.Temperature)
+	// Create provider instance
+	prov, err := registry.Create(selectedProvider, selectedModel, providerCfg.Temperature)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, styles.Error.Render("Failed to create provider: "+err.Error()))
 		os.Exit(1)
@@ -225,7 +260,7 @@ func main() {
 
 	log.Info().
 		Str("provider", selectedProvider).
-		Str("model", providerCfg.Model).
+		Str("model", selectedModel).
 		Msg("Provider initialized")
 
 	// Initialize MCP client
@@ -266,7 +301,7 @@ func main() {
 		} else {
 			// Create new named session
 			sessionID = uuid.New().String()
-			if err := db.CreateSession(sessionID, selectedProvider, providerCfg.Model, &sessionName); err != nil {
+			if err := db.CreateSession(sessionID, selectedProvider, selectedModel, &sessionName); err != nil {
 				fmt.Fprintln(os.Stderr, styles.Error.Render("Failed to create session: "+err.Error()))
 				os.Exit(1)
 			}
@@ -276,7 +311,7 @@ func main() {
 	} else {
 		// Create anonymous session
 		sessionID = uuid.New().String()
-		if err := db.CreateSession(sessionID, selectedProvider, providerCfg.Model, nil); err != nil {
+		if err := db.CreateSession(sessionID, selectedProvider, selectedModel, nil); err != nil {
 			fmt.Fprintln(os.Stderr, styles.Error.Render("Failed to create session: "+err.Error()))
 			os.Exit(1)
 		}
@@ -299,7 +334,7 @@ func main() {
 	fmt.Println(styles.Brand.Render("║") + "  " + styles.BrandBold.Render("Mysis") + " - SpaceMolt Agent CLI         " + styles.Brand.Render("║"))
 	fmt.Println(styles.Brand.Render("╚══════════════════════════════════════╝"))
 	fmt.Println()
-	fmt.Println(styles.Muted.Render(fmt.Sprintf("Provider: %s (%s)", selectedProvider, providerCfg.Model)))
+	fmt.Println(styles.Muted.Render(fmt.Sprintf("Provider: %s (%s)", selectedProvider, selectedModel)))
 	fmt.Println(styles.Muted.Render(fmt.Sprintf("Tools: %d available", len(tools))))
 	fmt.Println(styles.Muted.Render(sessionInfo))
 	fmt.Println()
