@@ -127,13 +127,13 @@ func applyEnvOverrides(cfg *Config) {
 	}
 }
 
-// DataDir returns the path to the Mysis data directory (~/.mysis).
+// DataDir returns the path to the Mysis data directory (~/.config/mysis).
 func DataDir() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(home, ".mysis"), nil
+	return filepath.Join(home, ".config", "mysis"), nil
 }
 
 // EnsureDataDir creates the data directory if it doesn't exist.

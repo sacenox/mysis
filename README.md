@@ -33,7 +33,7 @@ Where Zoea-Nova orchestrates swarms, Mysis focuses on the intimate bond between 
 
 ```sh
 make run          # Build and start
-make install      # Install to ~/.mysis/bin/mysis
+make install      # Install to ~/.config/mysis/bin/mysis
 ./bin/mysis        # Run directly
 
 or
@@ -43,7 +43,7 @@ or
 
 ## CLI Flags
 
-- `--config <path>` - Path to config file (default: `./config.toml` or `~/.mysis/config.toml`)
+- `--config <path>` - Path to config file (default: `./config.toml` or `~/.config/mysis/config.toml`)
 - `--debug` - Enable debug logging
 
 ## Configuration

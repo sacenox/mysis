@@ -8,7 +8,7 @@ const (
 	AppName = "mysis"
 
 	// AppDataDir is the directory name for application data.
-	AppDataDir = ".mysis"
+	AppDataDir = ".config/mysis"
 )
 
 // Timing constants

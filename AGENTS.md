@@ -10,7 +10,7 @@ The agent maintains conversation history and calls SpaceMolt game tools (login, 
 
 ## Core Components
 
-**Config** (`internal/config/`): TOML file loading, provider configuration, credential management. Data directory: `~/.mysis`.
+**Config** (`internal/config/`): TOML file loading, provider configuration, credential management. Data directory: `~/.config/mysis`.
 
 **Provider** (`internal/provider/`): OpenAI-compatible LLM client interface. Supports Ollama (local) and OpenCode Zen (cloud). Factory pattern for creating providers with model/temperature params.
 
@@ -41,12 +41,12 @@ The agent maintains conversation history and calls SpaceMolt game tools (login, 
 
 **Config-driven**: Provider selection via config file. No runtime provider switching.
 
-**Data directory**: `~/.mysis` for config, credentials, future message history.
+**Data directory**: `~/.config/mysis` for config, credentials, future message history.
 
 ## Where to Find Things
 
-- Config: `config.toml` and `~/.mysis/`
-- Credentials: `~/.mysis/credentials.json` (auto-created with 0600)
+- Config: `config.toml` and `~/.config/mysis/`
+- Credentials: `~/.config/mysis/credentials.json` (auto-created with 0600)
 - Logs: stderr (zerolog)
 - Main entry: `cmd/mysis/main.go`
 - Provider registry: `internal/provider/registry.go`

@@ -48,4 +48,27 @@ var (
 	SuccessStyle = lipgloss.NewStyle().
 			Foreground(ColorSuccess).
 			Bold(true)
+
+	// Brand styles for primary UI elements
+	Brand = lipgloss.NewStyle().
+		Foreground(ColorBrand)
+
+	BrandBold = lipgloss.NewStyle().
+			Foreground(ColorBrand).
+			Bold(true)
+
+	// Secondary color (teal)
+	Secondary = lipgloss.NewStyle().
+			Foreground(ColorTeal)
+
+	// Muted text
+	Muted = lipgloss.NewStyle().
+		Foreground(ColorMuted)
+
+	// Semantic styles
+	Error = lipgloss.NewStyle().
+		Foreground(ColorError)
+
+	Success = lipgloss.NewStyle().
+		Foreground(ColorSuccess)
 )
