@@ -13,6 +13,7 @@ mysis/
 │   ├── constants/       # Application constants
 │   ├── mcp/            # MCP client and proxy (from zoea-nova)
 │   ├── provider/       # LLM provider abstraction (from zoea-nova)
+│   ├── store/          # SQLite persistence for conversation history
 │   └── styles/         # UI styling with brand colors
 ├── assets/
 │   └── logos/          # Branding assets (from zoea-nova)
@@ -64,7 +65,7 @@ LLM provider abstraction with:
 Configuration management with:
 - TOML config file parsing
 - Credentials handling
-- Data directory management
+- Data directory management (`~/.config/mysis`)
 - Provider configuration
 
 **Files:**
@@ -72,25 +73,41 @@ Configuration management with:
 - `credentials.go` - Secure credential handling
 - Tests
 
-### 4. Brand Assets
+### 4. Store Package (`internal/store/`)
+SQLite persistence layer for conversation history:
+- Session management (create, resume, list)
+- Message storage with tool calls and reasoning
+- Multi-instance support (no locking conflicts)
+- WAL mode for concurrent access
+
+**Database Schema:**
+- `sessions` - Conversation sessions with provider info
+- `messages` - Message history per session
+- Stored at `~/.config/mysis/mysis.db`
+
+**Files:**
+- `store.go` - Database operations and schema
+
+### 5. Brand Assets
 - Logo files (SVG format)
 - Brand colors: #9D00FF (electric purple), #00FFCC (bright teal)
 - Style definitions in `internal/styles/styles.go`
 
-### 5. Configuration
+### 6. Configuration
 - `config.toml` with provider definitions
 - Support for Ollama (local) and OpenCode Zen (cloud)
 - MCP upstream configuration
 
 ## Technology Stack
 
-Inherited from zoea-nova:
-- **Go 1.24.2** - Programming language
-- **Bubble Tea** - TUI framework (dependency ready)
+Core dependencies:
+- **Go 1.25.6** - Programming language
+- **SQLite 3** - Conversation persistence (`github.com/mattn/go-sqlite3`)
+- **UUID** - Session IDs (`github.com/google/uuid`)
 - **Lipgloss** - Terminal styling
-- **go-openai** - OpenAI-compatible API client
+- **go-openai** - OpenAI-compatible API client (`github.com/sashabaranov/go-openai`)
 - **zerolog** - Structured logging
-- **TOML** - Configuration format
+- **TOML** - Configuration format (`github.com/BurntSushi/toml`)
 
 ## Brand Colors
 
@@ -112,9 +129,31 @@ This is a scaffold with reusable infrastructure. Implementation of application-s
 4. Build TUI components using the established brand styling
 5. Add tests following the patterns from zoea-nova
 
+## Data Storage
+
+**Config Directory:** `~/.config/mysis/`
+- `config.toml` - Configuration file (optional, falls back to `./config.toml`)
+- `credentials.json` - API keys (mode 0600)
+- `mysis.db` - SQLite database for conversation history
+- `account-backup.md` - Backup of SpaceMolt test accounts
+
+**Session Management:**
+- Each CLI instance creates a unique session (UUID)
+- Sessions can be named for easy resumption: `--session my-session`
+- Anonymous sessions get auto-generated IDs
+- Multiple instances can run concurrently without conflicts
+
+**Database Features:**
+- WAL mode for concurrent read/write
+- Automatic schema initialization
+- Full conversation history (user, assistant, tool messages)
+- Tool calls stored as JSON
+- Session metadata (provider, model, timestamps)
+
 ## Notes
 
 - All import paths updated from `github.com/xonecas/zoea-nova` to `github.com/xonecas/mysis`
 - The MCP client is configured to connect to `https://game.spacemolt.com/mcp`
 - Provider configurations support both local (Ollama) and cloud (OpenCode Zen) models
 - The project maintains the retro-futuristic aesthetic from zoea-nova
+- Config directory changed from `~/.mysis` to `~/.config/mysis` (XDG Base Directory standard)

@@ -8,12 +8,15 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/xonecas/mysis/internal/config"
 	"github.com/xonecas/mysis/internal/mcp"
 	"github.com/xonecas/mysis/internal/provider"
+	"github.com/xonecas/mysis/internal/store"
 	"github.com/xonecas/mysis/internal/styles"
 )
 
@@ -27,6 +30,8 @@ func main() {
 		configPath   = flag.String("config", "", "Path to config file")
 		debug        = flag.Bool("debug", false, "Enable debug logging")
 		providerName = flag.String("p", "", "Provider name (overrides default from config)")
+		sessionName  = flag.String("session", "", "Session name (resume or create named session)")
+		listSessions = flag.Bool("list-sessions", false, "List recent sessions and exit")
 	)
 	flag.Parse()
 
@@ -73,6 +78,23 @@ func main() {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, styles.Error.Render("Failed to load config: "+err.Error()))
 		os.Exit(1)
+	}
+
+	// Open database
+	db, err := store.Open()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, styles.Error.Render("Failed to open database: "+err.Error()))
+		os.Exit(1)
+	}
+	defer db.Close()
+
+	// Handle --list-sessions flag
+	if *listSessions {
+		if err := listSessionsCmd(db); err != nil {
+			fmt.Fprintln(os.Stderr, styles.Error.Render("Error: "+err.Error()))
+			os.Exit(1)
+		}
+		return
 	}
 
 	// Load credentials
@@ -139,21 +161,69 @@ func main() {
 		log.Info().Int("count", len(tools)).Msg("Tools available")
 	}
 
+	// Initialize or resume session
+	var sessionID string
+	var sessionInfo string
+	if *sessionName != "" {
+		// Try to resume by name
+		sess, err := db.GetSessionByName(*sessionName)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, styles.Error.Render("Failed to load session: "+err.Error()))
+			os.Exit(1)
+		}
+		if sess != nil {
+			sessionID = sess.ID
+			sessionInfo = fmt.Sprintf("Resumed session: %s", *sessionName)
+			log.Info().Str("session_id", sessionID).Str("name", *sessionName).Msg("Resumed session")
+		} else {
+			// Create new named session
+			sessionID = uuid.New().String()
+			if err := db.CreateSession(sessionID, selectedProvider, providerCfg.Model, sessionName); err != nil {
+				fmt.Fprintln(os.Stderr, styles.Error.Render("Failed to create session: "+err.Error()))
+				os.Exit(1)
+			}
+			sessionInfo = fmt.Sprintf("New session: %s", *sessionName)
+			log.Info().Str("session_id", sessionID).Str("name", *sessionName).Msg("Created named session")
+		}
+	} else {
+		// Create anonymous session
+		sessionID = uuid.New().String()
+		if err := db.CreateSession(sessionID, selectedProvider, providerCfg.Model, nil); err != nil {
+			fmt.Fprintln(os.Stderr, styles.Error.Render("Failed to create session: "+err.Error()))
+			os.Exit(1)
+		}
+		sessionInfo = fmt.Sprintf("Session: %s", sessionID[:8])
+		log.Info().Str("session_id", sessionID).Msg("Created anonymous session")
+	}
+
+	// Load message history
+	history, err := db.LoadMessages(sessionID)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, styles.Error.Render("Failed to load history: "+err.Error()))
+		os.Exit(1)
+	}
+	if len(history) > 0 {
+		log.Info().Int("count", len(history)).Msg("Loaded message history")
+	}
+
 	// Print welcome message
 	fmt.Println(styles.Brand.Render("╔══════════════════════════════════════╗"))
-	fmt.Println(styles.Brand.Render("║") + "  " + styles.BrandBold.Render("Mysis") + " - SpaceMolt Agent CLI     " + styles.Brand.Render("║"))
+	fmt.Println(styles.Brand.Render("║") + "  " + styles.BrandBold.Render("Mysis") + " - SpaceMolt Agent CLI         " + styles.Brand.Render("║"))
 	fmt.Println(styles.Brand.Render("╚══════════════════════════════════════╝"))
 	fmt.Println()
 	fmt.Println(styles.Muted.Render(fmt.Sprintf("Provider: %s (%s)", selectedProvider, providerCfg.Model)))
 	fmt.Println(styles.Muted.Render(fmt.Sprintf("Tools: %d available", len(tools))))
+	fmt.Println(styles.Muted.Render(sessionInfo))
 	fmt.Println()
 
 	// Start conversation loop
 	app := &App{
-		provider: prov,
-		proxy:    proxy,
-		tools:    tools,
-		history:  []provider.Message{},
+		provider:  prov,
+		proxy:     proxy,
+		tools:     tools,
+		history:   history,
+		db:        db,
+		sessionID: sessionID,
 	}
 
 	if err := app.Run(ctx); err != nil {
@@ -164,10 +234,12 @@ func main() {
 
 // App holds the application state
 type App struct {
-	provider provider.Provider
-	proxy    *mcp.Proxy
-	tools    []mcp.Tool
-	history  []provider.Message
+	provider  provider.Provider
+	proxy     *mcp.Proxy
+	tools     []mcp.Tool
+	history   []provider.Message
+	db        *store.Store
+	sessionID string
 }
 
 // Run starts the conversation loop
@@ -195,10 +267,16 @@ func (app *App) Run(ctx context.Context) error {
 		}
 
 		// Add user message to history
-		app.history = append(app.history, provider.Message{
+		userMsg := provider.Message{
 			Role:    "user",
 			Content: input,
-		})
+		}
+		app.history = append(app.history, userMsg)
+
+		// Save user message
+		if err := app.db.SaveMessage(app.sessionID, userMsg); err != nil {
+			log.Warn().Err(err).Msg("Failed to save user message")
+		}
 
 		// Process turn (may involve multiple LLM calls if tools are used)
 		if err := app.processTurn(ctx); err != nil {
@@ -214,7 +292,7 @@ func (app *App) Run(ctx context.Context) error {
 
 // processTurn handles one conversation turn, which may involve tool calls
 func (app *App) processTurn(ctx context.Context) error {
-	maxToolRounds := 10 // Prevent infinite loops
+	maxToolRounds := 20 // Prevent infinite loops
 
 	for round := 0; round < maxToolRounds; round++ {
 		// Convert MCP tools to provider format
@@ -245,7 +323,7 @@ func (app *App) processTurn(ctx context.Context) error {
 			}
 
 			// Add assistant response to history
-			app.history = append(app.history, provider.Message{
+			app.addMessage(provider.Message{
 				Role:    "assistant",
 				Content: resp.Content,
 			})
@@ -254,7 +332,7 @@ func (app *App) processTurn(ctx context.Context) error {
 		}
 
 		// Tool calls present - add assistant message with tool calls to history
-		app.history = append(app.history, provider.Message{
+		app.addMessage(provider.Message{
 			Role:      "assistant",
 			Content:   resp.Content,
 			ToolCalls: resp.ToolCalls,
@@ -283,7 +361,7 @@ func (app *App) processTurn(ctx context.Context) error {
 				fmt.Println(styles.Error.Render("  Error: " + err.Error()))
 
 				// Add error result to history
-				app.history = append(app.history, provider.Message{
+				app.addMessage(provider.Message{
 					Role:       "tool",
 					Content:    fmt.Sprintf("Error: %v", err),
 					ToolCallID: toolCall.ID,
@@ -306,7 +384,7 @@ func (app *App) processTurn(ctx context.Context) error {
 				}
 
 				// Add error result to history
-				app.history = append(app.history, provider.Message{
+				app.addMessage(provider.Message{
 					Role:       "tool",
 					Content:    errText,
 					ToolCallID: toolCall.ID,
@@ -334,7 +412,7 @@ func (app *App) processTurn(ctx context.Context) error {
 			}
 
 			// Add tool result to history
-			app.history = append(app.history, provider.Message{
+			app.addMessage(provider.Message{
 				Role:       "tool",
 				Content:    resultText,
 				ToolCallID: toolCall.ID,
@@ -345,6 +423,74 @@ func (app *App) processTurn(ctx context.Context) error {
 	}
 
 	return fmt.Errorf("too many tool call rounds (limit: %d)", maxToolRounds)
+}
+
+// addMessage adds a message to history and saves it to the database.
+func (app *App) addMessage(msg provider.Message) {
+	app.history = append(app.history, msg)
+	if err := app.db.SaveMessage(app.sessionID, msg); err != nil {
+		log.Warn().Err(err).Msg("Failed to save message to database")
+	}
+}
+
+// listSessionsCmd lists recent sessions.
+func listSessionsCmd(db *store.Store) error {
+	sessions, err := db.ListSessions(20)
+	if err != nil {
+		return fmt.Errorf("list sessions: %w", err)
+	}
+
+	if len(sessions) == 0 {
+		fmt.Println("No sessions found")
+		return nil
+	}
+
+	fmt.Println(styles.Brand.Render("Recent Sessions:"))
+	fmt.Println()
+
+	for _, sess := range sessions {
+		fmt.Printf("%s  ", styles.Muted.Render(sess.ID[:8]))
+
+		if sess.Name != nil {
+			fmt.Print(styles.BrandBold.Render(*sess.Name))
+		} else {
+			fmt.Print(styles.Muted.Render("(anonymous)"))
+		}
+
+		fmt.Printf(" - %s (%s)\n", sess.Provider, sess.Model)
+
+		elapsed := time.Since(sess.LastActiveAt)
+		fmt.Printf("       %s\n", styles.Muted.Render(formatDuration(elapsed)+" ago"))
+		fmt.Println()
+	}
+
+	return nil
+}
+
+// formatDuration formats a duration in human-readable form.
+func formatDuration(d time.Duration) string {
+	if d < time.Minute {
+		return "just now"
+	}
+	if d < time.Hour {
+		mins := int(d.Minutes())
+		if mins == 1 {
+			return "1 minute"
+		}
+		return fmt.Sprintf("%d minutes", mins)
+	}
+	if d < 24*time.Hour {
+		hours := int(d.Hours())
+		if hours == 1 {
+			return "1 hour"
+		}
+		return fmt.Sprintf("%d hours", hours)
+	}
+	days := int(d.Hours() / 24)
+	if days == 1 {
+		return "1 day"
+	}
+	return fmt.Sprintf("%d days", days)
 }
 
 // initializeProviders creates and registers all configured providers
