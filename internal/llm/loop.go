@@ -1,0 +1,217 @@
+package llm
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
+
+	"github.com/rs/zerolog/log"
+	"github.com/xonecas/mysis/internal/mcp"
+	"github.com/xonecas/mysis/internal/provider"
+	"github.com/xonecas/mysis/internal/store"
+	"github.com/xonecas/mysis/internal/styles"
+)
+
+// MessageCallback is called when a message should be added to history and saved.
+type MessageCallback func(msg provider.Message)
+
+// ProcessTurnOptions holds configuration for processing a turn.
+type ProcessTurnOptions struct {
+	Provider        provider.Provider
+	Proxy           *mcp.Proxy
+	Tools           []mcp.Tool
+	History         []provider.Message
+	OnMessage       MessageCallback
+	MaxToolRounds   int
+	HistoryKeepLast int
+}
+
+// ProcessTurn handles one conversation turn, which may involve tool calls.
+// It returns an error if the LLM call fails or max rounds are exceeded.
+func ProcessTurn(ctx context.Context, opts ProcessTurnOptions) error {
+	if opts.MaxToolRounds == 0 {
+		opts.MaxToolRounds = 20
+	}
+	if opts.HistoryKeepLast == 0 {
+		opts.HistoryKeepLast = 10
+	}
+
+	for round := 0; round < opts.MaxToolRounds; round++ {
+		// Compress history before sending to LLM
+		// Keep last N turns full, compress older state queries
+		compressedHistory := store.CompressHistory(opts.History, opts.HistoryKeepLast)
+
+		// Log compression stats
+		if len(compressedHistory) < len(opts.History) {
+			originalTokens := store.EstimateTokenCount(opts.History)
+			compressedTokens := store.EstimateTokenCount(compressedHistory)
+			log.Debug().
+				Int("original_msgs", len(opts.History)).
+				Int("compressed_msgs", len(compressedHistory)).
+				Int("original_tokens", originalTokens).
+				Int("compressed_tokens", compressedTokens).
+				Int("saved_tokens", originalTokens-compressedTokens).
+				Msg("History compressed")
+		}
+
+		// Convert MCP tools to provider format
+		providerTools := make([]provider.Tool, len(opts.Tools))
+		for i, t := range opts.Tools {
+			providerTools[i] = provider.Tool{
+				Name:        t.Name,
+				Description: t.Description,
+				Parameters:  t.InputSchema,
+			}
+		}
+
+		// Call LLM with compressed history
+		resp, err := opts.Provider.ChatWithTools(ctx, compressedHistory, providerTools)
+		if err != nil {
+			return fmt.Errorf("LLM call failed: %w", err)
+		}
+
+		// Display reasoning if present
+		if resp.Reasoning != "" {
+			displayReasoning(resp.Reasoning)
+		}
+
+		// If no tool calls, display text response and we're done
+		if len(resp.ToolCalls) == 0 {
+			if resp.Content != "" {
+				fmt.Println(resp.Content)
+			}
+
+			// Add assistant response to history
+			opts.OnMessage(provider.Message{
+				Role:    "assistant",
+				Content: resp.Content,
+			})
+
+			return nil
+		}
+
+		// Tool calls present - add assistant message with tool calls to history
+		opts.OnMessage(provider.Message{
+			Role:      "assistant",
+			Content:   resp.Content,
+			ToolCalls: resp.ToolCalls,
+		})
+
+		// Execute each tool call
+		if err := executeToolCalls(ctx, opts.Proxy, resp.ToolCalls, opts.OnMessage); err != nil {
+			return err
+		}
+
+		// Continue loop to let LLM process tool results
+	}
+
+	return fmt.Errorf("too many tool call rounds (limit: %d)", opts.MaxToolRounds)
+}
+
+// displayReasoning shows the LLM's reasoning in a compact format.
+func displayReasoning(reasoning string) {
+	// Trim excessive whitespace and collapse multiple spaces/newlines
+	reasoning = strings.TrimSpace(reasoning)
+	reasoning = strings.Join(strings.Fields(reasoning), " ")
+
+	// Truncate if too long
+	if len(reasoning) > 200 {
+		reasoning = reasoning[:197] + "..."
+	}
+
+	fmt.Println(styles.Muted.Render("∴ " + reasoning))
+}
+
+// executeToolCalls executes a list of tool calls and adds results to history.
+func executeToolCalls(ctx context.Context, proxy *mcp.Proxy, toolCalls []provider.ToolCall, onMessage MessageCallback) error {
+	for _, toolCall := range toolCalls {
+		fmt.Print(styles.Secondary.Render(fmt.Sprintf("⚙ %s", toolCall.Name)))
+
+		// Show arguments (truncated if long)
+		displayToolArguments(toolCall.Arguments)
+
+		// Execute tool via MCP proxy
+		result, err := proxy.CallTool(ctx, toolCall.Name, toolCall.Arguments)
+
+		if err != nil {
+			fmt.Println(styles.Error.Render(" ✗"))
+			fmt.Println(styles.Error.Render("  Error: " + err.Error()))
+
+			// Add error result to history
+			onMessage(provider.Message{
+				Role:       "tool",
+				Content:    fmt.Sprintf("Error: %v", err),
+				ToolCallID: toolCall.ID,
+			})
+			continue
+		}
+
+		// Check if result is an error
+		if result.IsError {
+			fmt.Println(styles.Error.Render(" ✗"))
+			errText := extractTextFromContent(result.Content)
+			if errText != "" {
+				fmt.Println(styles.Error.Render("  " + errText))
+			}
+
+			// Add error result to history
+			onMessage(provider.Message{
+				Role:       "tool",
+				Content:    errText,
+				ToolCallID: toolCall.ID,
+			})
+			continue
+		}
+
+		// Success
+		fmt.Println(styles.Success.Render(" ✓"))
+
+		// Extract and display result
+		resultText := extractTextFromContent(result.Content)
+		displayToolResult(resultText)
+
+		// Add tool result to history
+		onMessage(provider.Message{
+			Role:       "tool",
+			Content:    resultText,
+			ToolCallID: toolCall.ID,
+		})
+	}
+
+	return nil
+}
+
+// displayToolArguments shows tool arguments in a truncated format.
+func displayToolArguments(arguments json.RawMessage) {
+	var args map[string]interface{}
+	if err := json.Unmarshal(arguments, &args); err == nil {
+		argsStr, _ := json.Marshal(args)
+		if len(argsStr) > 60 {
+			argsStr = argsStr[:57]
+			argsStr = append(argsStr, '.', '.', '.')
+		}
+		fmt.Print(styles.Muted.Render(string(argsStr)))
+	}
+}
+
+// displayToolResult shows tool result in a truncated format.
+func displayToolResult(resultText string) {
+	if len(resultText) > 100 {
+		preview := resultText[:97] + "..."
+		fmt.Println(styles.Muted.Render("  " + preview))
+	} else if resultText != "" {
+		fmt.Println(styles.Muted.Render("  " + resultText))
+	}
+}
+
+// extractTextFromContent extracts text from MCP content blocks.
+func extractTextFromContent(content []mcp.ContentBlock) string {
+	var text string
+	for _, block := range content {
+		if block.Type == "text" {
+			text += block.Text
+		}
+	}
+	return text
+}

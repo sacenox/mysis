@@ -123,13 +123,45 @@ All tests pass:
 - Cascade deletion verified
 - Session isolation verified
 
+## Integration Status
+
+✅ **Tools are registered in the CLI** (`internal/cli/cli.go:145-157`)
+
+The credential tools are automatically registered when the CLI starts:
+
+1. Session is initialized (gets unique sessionID)
+2. Tools are registered with session-scoped handlers
+3. Tools are included in the tool list sent to the LLM
+4. Agent can call `save_credentials` and `get_credentials` automatically
+
+**Logs:**
+- Debug log shows: `Registered local credential tools` with session_id and tool count
+- Info log shows total tool count (upstream + local credentials)
+
+**How it works:**
+
+```go
+// internal/cli/cli.go (lines 145-157)
+proxy.RegisterTool(
+    mcp.NewSaveCredentialsTool(),
+    mcp.MakeSaveCredentialsHandler(db, sessionID),
+)
+proxy.RegisterTool(
+    mcp.NewGetCredentialsTool(),
+    mcp.MakeGetCredentialsHandler(db, sessionID),
+)
+```
+
+The sessionID is injected into the handlers via closure, never exposed to the agent.
+
 ## Files Modified
 
 1. `internal/store/store.go` - Added schema + store functions
-2. `internal/mcp/tools.go` - Implemented MCP tools
-3. `internal/mcp/tools_test.go` - Unit tests
-4. `internal/mcp/integration_test.go` - Integration tests
-5. `internal/store/credentials_test.go` - Store tests
+2. `internal/mcp/tools.go` - Implemented MCP tools (144 lines)
+3. `internal/mcp/tools_test.go` - Unit tests (213 lines)
+4. `internal/store/credentials_test.go` - Store tests (153 lines)
+5. `internal/cli/cli.go` - Tool registration in CLI
+6. `Makefile` - Added `backup-credentials` command
 
 ## Backup and Restore
 
