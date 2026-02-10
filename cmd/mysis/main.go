@@ -25,19 +25,89 @@ import (
 // Version is set at build time via ldflags.
 var Version = "dev"
 
+// printHelp displays usage information.
+func printHelp() {
+	fmt.Println(styles.Brand.Render("╔══════════════════════════════════════╗"))
+	fmt.Println(styles.Brand.Render("║") + "  " + styles.BrandBold.Render("Mysis") + " - SpaceMolt Agent CLI         " + styles.Brand.Render("║"))
+	fmt.Println(styles.Brand.Render("╚══════════════════════════════════════╝"))
+	fmt.Println()
+	fmt.Println(styles.BrandBold.Render("USAGE:"))
+	fmt.Println("  mysis [flags]")
+	fmt.Println()
+	fmt.Println(styles.BrandBold.Render("FLAGS:"))
+	fmt.Println("  " + styles.Secondary.Render("-h, --help") + "              Show this help message")
+	fmt.Println("  " + styles.Secondary.Render("-v, --version") + "           Show version information")
+	fmt.Println("  " + styles.Secondary.Render("-c, --config") + " PATH       Path to config file (default: config.toml)")
+	fmt.Println("  " + styles.Secondary.Render("-d, --debug") + "             Enable debug logging")
+	fmt.Println("  " + styles.Secondary.Render("-p, --provider") + " NAME     Provider name (overrides config default)")
+	fmt.Println("  " + styles.Secondary.Render("-s, --session") + " NAME      Session name (resume or create)")
+	fmt.Println("  " + styles.Secondary.Render("-l, --list-sessions") + "     List recent sessions and exit")
+	fmt.Println("  " + styles.Secondary.Render("-D, --delete-session") + " N  Delete session by name and exit")
+	fmt.Println()
+	fmt.Println(styles.BrandBold.Render("EXAMPLES:"))
+	fmt.Println("  # Start anonymous session")
+	fmt.Println("  mysis")
+	fmt.Println()
+	fmt.Println("  # Resume or create named session")
+	fmt.Println("  mysis -s mybot")
+	fmt.Println()
+	fmt.Println("  # List all sessions")
+	fmt.Println("  mysis -l")
+	fmt.Println()
+	fmt.Println("  # Delete a session")
+	fmt.Println("  mysis -D mybot")
+	fmt.Println()
+	fmt.Println(styles.BrandBold.Render("IN-SESSION COMMANDS:"))
+	fmt.Println("  " + styles.Secondary.Render("/autoplay <message>") + "    Start autonomous gameplay with given goal")
+	fmt.Println("  " + styles.Secondary.Render("/autoplay stop") + "         Stop autonomous gameplay")
+	fmt.Println("  " + styles.Secondary.Render("exit, quit") + "             Exit the session")
+	fmt.Println()
+	fmt.Println(styles.Muted.Render("Note: Running without -s/--session creates an anonymous session (not saved by name)."))
+	fmt.Println()
+}
+
 func main() {
 	// Parse flags
 	var (
-		showVersion  = flag.Bool("version", false, "Show version and exit")
-		configPath   = flag.String("config", "", "Path to config file")
-		debug        = flag.Bool("debug", false, "Enable debug logging")
-		providerName = flag.String("p", "", "Provider name (overrides default from config)")
-		sessionName  = flag.String("session", "", "Session name (resume or create named session)")
-		listSessions = flag.Bool("list-sessions", false, "List recent sessions and exit")
+		showHelp      bool
+		showVersion   bool
+		configPath    string
+		debug         bool
+		providerName  string
+		sessionName   string
+		listSessions  bool
+		deleteSession string
 	)
+	flag.BoolVar(&showHelp, "help", false, "Show help and exit")
+	flag.BoolVar(&showHelp, "h", false, "Show help and exit (shorthand)")
+	flag.BoolVar(&showVersion, "version", false, "Show version and exit")
+	flag.BoolVar(&showVersion, "v", false, "Show version and exit (shorthand)")
+	flag.StringVar(&configPath, "config", "", "Path to config file")
+	flag.StringVar(&configPath, "c", "", "Path to config file (shorthand)")
+	flag.BoolVar(&debug, "debug", false, "Enable debug logging")
+	flag.BoolVar(&debug, "d", false, "Enable debug logging (shorthand)")
+	flag.StringVar(&providerName, "provider", "", "Provider name (overrides default from config)")
+	flag.StringVar(&providerName, "p", "", "Provider name (shorthand)")
+	flag.StringVar(&sessionName, "session", "", "Session name (resume or create named session)")
+	flag.StringVar(&sessionName, "s", "", "Session name (shorthand)")
+	flag.BoolVar(&listSessions, "list-sessions", false, "List recent sessions and exit")
+	flag.BoolVar(&listSessions, "l", false, "List recent sessions and exit (shorthand)")
+	flag.StringVar(&deleteSession, "delete-session", "", "Delete a session by name")
+	flag.StringVar(&deleteSession, "D", "", "Delete a session by name (shorthand)")
+
+	// Custom usage function
+	flag.Usage = func() {
+		printHelp()
+	}
+
 	flag.Parse()
 
-	if *showVersion {
+	if showHelp {
+		printHelp()
+		os.Exit(0)
+	}
+
+	if showVersion {
 		fmt.Printf("Mysis %s\n", Version)
 		os.Exit(0)
 	}
@@ -45,26 +115,26 @@ func main() {
 	// Initialize logging
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
-	if *debug {
+	if debug {
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	} else {
 		zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	}
 
 	// Find config file
-	if *configPath == "" {
+	if configPath == "" {
 		// Try current directory first, then ~/.config/mysis/
 		if _, err := os.Stat("config.toml"); err == nil {
-			*configPath = "config.toml"
+			configPath = "config.toml"
 		} else {
 			dataDir, err := config.DataDir()
 			if err == nil {
-				*configPath = dataDir + "/config.toml"
+				configPath = dataDir + "/config.toml"
 			}
 		}
 	}
 
-	if *configPath == "" {
+	if configPath == "" {
 		fmt.Fprintln(os.Stderr, styles.Error.Render("Error: config file not found"))
 		fmt.Fprintln(os.Stderr, "Tried: ./config.toml and ~/.config/mysis/config.toml")
 		os.Exit(1)
@@ -72,11 +142,11 @@ func main() {
 
 	log.Info().
 		Str("version", Version).
-		Str("config", *configPath).
+		Str("config", configPath).
 		Msg("Starting Mysis")
 
 	// Load config
-	cfg, err := config.Load(*configPath)
+	cfg, err := config.Load(configPath)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, styles.Error.Render("Failed to load config: "+err.Error()))
 		os.Exit(1)
@@ -91,8 +161,17 @@ func main() {
 	defer db.Close()
 
 	// Handle --list-sessions flag
-	if *listSessions {
+	if listSessions {
 		if err := listSessionsCmd(db); err != nil {
+			fmt.Fprintln(os.Stderr, styles.Error.Render("Error: "+err.Error()))
+			os.Exit(1)
+		}
+		return
+	}
+
+	// Handle --delete-session flag
+	if deleteSession != "" {
+		if err := deleteSessionCmd(db, deleteSession); err != nil {
 			fmt.Fprintln(os.Stderr, styles.Error.Render("Error: "+err.Error()))
 			os.Exit(1)
 		}
@@ -110,7 +189,7 @@ func main() {
 	registry := initializeProviders(cfg, creds)
 
 	// Select provider
-	selectedProvider := *providerName
+	selectedProvider := providerName
 	if selectedProvider == "" {
 		// Use first provider from config
 		for name := range cfg.Providers {
@@ -166,26 +245,26 @@ func main() {
 	// Initialize or resume session
 	var sessionID string
 	var sessionInfo string
-	if *sessionName != "" {
+	if sessionName != "" {
 		// Try to resume by name
-		sess, err := db.GetSessionByName(*sessionName)
+		sess, err := db.GetSessionByName(sessionName)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, styles.Error.Render("Failed to load session: "+err.Error()))
 			os.Exit(1)
 		}
 		if sess != nil {
 			sessionID = sess.ID
-			sessionInfo = fmt.Sprintf("Resumed session: %s", *sessionName)
-			log.Info().Str("session_id", sessionID).Str("name", *sessionName).Msg("Resumed session")
+			sessionInfo = fmt.Sprintf("Resumed session: %s", sessionName)
+			log.Info().Str("session_id", sessionID).Str("name", sessionName).Msg("Resumed session")
 		} else {
 			// Create new named session
 			sessionID = uuid.New().String()
-			if err := db.CreateSession(sessionID, selectedProvider, providerCfg.Model, sessionName); err != nil {
+			if err := db.CreateSession(sessionID, selectedProvider, providerCfg.Model, &sessionName); err != nil {
 				fmt.Fprintln(os.Stderr, styles.Error.Render("Failed to create session: "+err.Error()))
 				os.Exit(1)
 			}
-			sessionInfo = fmt.Sprintf("New session: %s", *sessionName)
-			log.Info().Str("session_id", sessionID).Str("name", *sessionName).Msg("Created named session")
+			sessionInfo = fmt.Sprintf("New session: %s", sessionName)
+			log.Info().Str("session_id", sessionID).Str("name", sessionName).Msg("Created named session")
 		}
 	} else {
 		// Create anonymous session
@@ -513,6 +592,40 @@ func listSessionsCmd(db *store.Store) error {
 		fmt.Println()
 	}
 
+	return nil
+}
+
+// deleteSessionCmd deletes a session by name.
+func deleteSessionCmd(db *store.Store, name string) error {
+	// Get session to show info before deletion
+	sess, err := db.GetSessionByName(name)
+	if err != nil {
+		return fmt.Errorf("get session: %w", err)
+	}
+	if sess == nil {
+		return fmt.Errorf("session '%s' not found", name)
+	}
+
+	// Get message count
+	messages, err := db.LoadMessages(sess.ID)
+	if err != nil {
+		return fmt.Errorf("load messages: %w", err)
+	}
+
+	// Confirm deletion
+	fmt.Printf("Delete session '%s'?\n", styles.BrandBold.Render(name))
+	fmt.Printf("  ID: %s\n", sess.ID[:8])
+	fmt.Printf("  Provider: %s (%s)\n", sess.Provider, sess.Model)
+	fmt.Printf("  Messages: %d\n", len(messages))
+	fmt.Printf("  Created: %s\n", formatDuration(time.Since(sess.CreatedAt))+" ago")
+	fmt.Println()
+
+	// Delete
+	if err := db.DeleteSessionByName(name); err != nil {
+		return fmt.Errorf("delete session: %w", err)
+	}
+
+	fmt.Println(styles.Success.Render(fmt.Sprintf("Deleted session '%s'", name)))
 	return nil
 }
 

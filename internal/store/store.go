@@ -302,3 +302,23 @@ func (s *Store) DeleteSession(id string) error {
 	_, err := s.db.Exec(query, id)
 	return err
 }
+
+// DeleteSessionByName deletes a session by name and all its messages.
+func (s *Store) DeleteSessionByName(name string) error {
+	query := `DELETE FROM sessions WHERE name = ?`
+	result, err := s.db.Exec(query, name)
+	if err != nil {
+		return fmt.Errorf("delete session by name: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("session '%s' not found", name)
+	}
+
+	return nil
+}
