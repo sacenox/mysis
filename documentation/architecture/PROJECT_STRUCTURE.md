@@ -42,8 +42,10 @@ Complete MCP client implementation with:
 - `client.go` - MCP HTTP client
 - `proxy.go` - MCP proxy with local tool support
 - `stub.go` - Stub server for offline testing
-- `tools.go` - Tool definitions and helpers
-- Tests for all components
+- `tools.go` - Local tool implementations (credential management)
+- `tools_test.go` - Unit tests for tool handlers
+- `integration_test.go` - Full workflow tests with proxy
+- Additional tests for all components
 
 ### 2. Provider Package (`internal/provider/`)
 LLM provider abstraction with:
@@ -74,19 +76,22 @@ Configuration management with:
 - Tests
 
 ### 4. Store Package (`internal/store/`)
-SQLite persistence layer for conversation history:
+SQLite persistence layer for conversation history and credentials:
 - Session management (create, resume, list)
 - Message storage with tool calls and reasoning
 - Multi-instance support (no locking conflicts)
 - WAL mode for concurrent access
+- Session-scoped credential storage
 
 **Database Schema:**
 - `sessions` - Conversation sessions with provider info
 - `messages` - Message history per session
+- `session_credentials` - Game credentials per session (foreign key to sessions)
 - Stored at `~/.config/mysis/mysis.db`
 
 **Files:**
 - `store.go` - Database operations and schema
+- `credentials_test.go` - Credential storage tests
 
 ### 5. Brand Assets
 - Logo files (SVG format)
@@ -134,8 +139,9 @@ This is a scaffold with reusable infrastructure. Implementation of application-s
 **Config Directory:** `~/.config/mysis/`
 - `config.toml` - Configuration file (optional, falls back to `./config.toml`)
 - `credentials.json` - API keys (mode 0600)
-- `mysis.db` - SQLite database for conversation history
+- `mysis.db` - SQLite database for conversation history and game credentials
 - `account-backup.md` - Backup of SpaceMolt test accounts
+- `credentials-backup-*.sql` - Timestamped credential backups
 
 **Session Management:**
 - Each CLI instance creates a unique session (UUID)
@@ -149,6 +155,43 @@ This is a scaffold with reusable infrastructure. Implementation of application-s
 - Full conversation history (user, assistant, tool messages)
 - Tool calls stored as JSON
 - Session metadata (provider, model, timestamps)
+- Foreign key constraints enabled (CASCADE delete for credentials)
+
+**Credential Management:**
+- Session-scoped credential storage via MCP tools
+- Agent can save/retrieve game credentials without user re-entry
+- Credentials isolated by session (Session A cannot access Session B's credentials)
+- Automatic cleanup when session is deleted (CASCADE)
+- Tools: `save_credentials`, `get_credentials`
+- Registered automatically in CLI on startup
+
+## Local MCP Tools
+
+The project includes local MCP tools registered with the proxy and available to the agent:
+
+### Credential Management Tools
+
+**`save_credentials`** - Saves username and password for the current session.
+- **Input:** `{ "username": "string", "password": "string" }`
+- **Response:** Success message with username confirmation
+- **Validation:** Both fields required (non-empty)
+
+**`get_credentials`** - Retrieves saved credentials for the current session.
+- **Input:** Empty object `{}`
+- **Response:** JSON with username/password, or message if none saved
+- **Session isolation:** Each session can only access its own credentials
+
+**Implementation:**
+- Defined in `internal/mcp/tools.go`
+- Registered automatically in `internal/cli/cli.go` on startup
+- Session ID injected via closure (never exposed to agent)
+- Full test coverage in `tools_test.go` and `integration_test.go`
+
+**Backup/Restore:**
+- `make backup-credentials` - Create timestamped SQL backup
+- Restore: `sqlite3 ~/.config/mysis/mysis.db < backup-file.sql`
+
+See `documentation/architecture/CREDENTIAL_TOOLS.md` for detailed implementation.
 
 ## Notes
 
@@ -157,3 +200,4 @@ This is a scaffold with reusable infrastructure. Implementation of application-s
 - Provider configurations support both local (Ollama) and cloud (OpenCode Zen) models
 - The project maintains the retro-futuristic aesthetic from zoea-nova
 - Config directory changed from `~/.mysis` to `~/.config/mysis` (XDG Base Directory standard)
+- Foreign key constraints enabled in SQLite for referential integrity

@@ -1,7 +1,7 @@
 # Ollama providers (local)
 [providers.ollama-qwen]
 endpoint = "http://localhost:11434"
-model = "qwen3:8b"
+model = "qwen3:14b"
 temperature = 0.3
 
 [providers.ollama-qwen-small]
