@@ -41,6 +41,7 @@ func printHelp() {
 	fmt.Println("  " + styles.Secondary.Render("-d, --debug") + "             Enable debug logging")
 	fmt.Println("  " + styles.Secondary.Render("-p, --provider") + " NAME     Provider name (overrides config default)")
 	fmt.Println("  " + styles.Secondary.Render("-s, --session") + " NAME      Session name (resume or create)")
+	fmt.Println("  " + styles.Secondary.Render("-a, --autoplay") + " MSG      Start autoplay immediately with message")
 	fmt.Println("  " + styles.Secondary.Render("-l, --list-sessions") + "     List recent sessions and exit")
 	fmt.Println("  " + styles.Secondary.Render("-D, --delete-session") + " N  Delete session by name and exit")
 	fmt.Println()
@@ -50,6 +51,9 @@ func printHelp() {
 	fmt.Println()
 	fmt.Println("  # Resume or create named session")
 	fmt.Println("  mysis -s mybot")
+	fmt.Println()
+	fmt.Println("  # Start with autoplay enabled")
+	fmt.Println("  mysis -s mybot -a \"explore and mine resources\"")
 	fmt.Println()
 	fmt.Println("  # List all sessions")
 	fmt.Println("  mysis -l")
@@ -77,6 +81,7 @@ func main() {
 		sessionName   string
 		listSessions  bool
 		deleteSession string
+		autoplay      string
 	)
 	flag.BoolVar(&showHelp, "help", false, "Show help and exit")
 	flag.BoolVar(&showHelp, "h", false, "Show help and exit (shorthand)")
@@ -94,6 +99,8 @@ func main() {
 	flag.BoolVar(&listSessions, "l", false, "List recent sessions and exit (shorthand)")
 	flag.StringVar(&deleteSession, "delete-session", "", "Delete a session by name")
 	flag.StringVar(&deleteSession, "D", "", "Delete a session by name (shorthand)")
+	flag.StringVar(&autoplay, "autoplay", "", "Start autoplay immediately with given message")
+	flag.StringVar(&autoplay, "a", "", "Start autoplay immediately (shorthand)")
 
 	// Custom usage function
 	flag.Usage = func() {
@@ -305,6 +312,14 @@ func main() {
 		history:   history,
 		db:        db,
 		sessionID: sessionID,
+	}
+
+	// Start autoplay if flag provided
+	if autoplay != "" {
+		if err := app.startAutoplayFromFlag(ctx, autoplay); err != nil {
+			fmt.Fprintln(os.Stderr, styles.Error.Render("Failed to start autoplay: "+err.Error()))
+			os.Exit(1)
+		}
 	}
 
 	if err := app.Run(ctx); err != nil {
@@ -686,6 +701,36 @@ func initializeProviders(cfg *config.Config, creds *config.Credentials) *provide
 	}
 
 	return registry
+}
+
+// startAutoplayFromFlag starts autoplay from CLI flag.
+func (app *App) startAutoplayFromFlag(ctx context.Context, message string) error {
+	app.mu.Lock()
+	if app.autoplayEnabled {
+		app.mu.Unlock()
+		return fmt.Errorf("autoplay already running")
+	}
+
+	app.autoplayEnabled = true
+	app.autoplayMessage = message
+
+	// Create cancelable context for autoplay goroutine
+	autoplayCtx, cancel := context.WithCancel(ctx)
+	app.autoplayCancel = cancel
+	app.mu.Unlock()
+
+	fmt.Println(styles.Secondary.Render(fmt.Sprintf("Autoplay started: \"%s\"", message)))
+	fmt.Println(styles.Muted.Render(fmt.Sprintf("Interval: %ds (%d avg tool calls × %ds/tick)",
+		int(constants.AutoplayInterval.Seconds()),
+		constants.AvgToolCallsPerTurn,
+		int(constants.GameTickDuration.Seconds()))))
+	fmt.Println(styles.Muted.Render("Type '/autoplay stop' to stop"))
+	fmt.Println()
+
+	// Start autoplay loop in background
+	go app.runAutoplay(autoplayCtx)
+
+	return nil
 }
 
 // handleAutoplayCommand handles /autoplay commands
