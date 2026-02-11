@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"time"
 )
 
 // ErrProviderNotFound is returned when a requested provider doesn't exist.
@@ -14,8 +15,10 @@ var ErrProviderNotFound = errors.New("provider not found")
 type Message struct {
 	Role       string
 	Content    string
+	Reasoning  string     // Model reasoning/thinking content (optional)
 	ToolCalls  []ToolCall // For assistant messages with tool calls
 	ToolCallID string     // For tool result messages
+	CreatedAt  time.Time  // Message timestamp
 }
 
 // Tool represents a tool/function definition for the LLM.

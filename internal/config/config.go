@@ -13,8 +13,9 @@ import (
 
 // Config is the root configuration structure.
 type Config struct {
-	Providers map[string]ProviderConfig `toml:"providers"`
-	MCP       MCPConfig                 `toml:"mcp"`
+	DefaultProvider string                    `toml:"default_provider"`
+	Providers       map[string]ProviderConfig `toml:"providers"`
+	MCP             MCPConfig                 `toml:"mcp"`
 }
 
 // ProviderConfig holds LLM provider settings.
@@ -71,6 +72,13 @@ func (c *Config) Validate() error {
 	} else {
 		for name, providerCfg := range c.Providers {
 			errs = append(errs, validateProviderConfig(name, providerCfg)...)
+		}
+	}
+
+	// Validate default provider if specified
+	if c.DefaultProvider != "" {
+		if _, ok := c.Providers[c.DefaultProvider]; !ok {
+			errs = append(errs, fmt.Errorf("default_provider=%q does not exist in providers", c.DefaultProvider))
 		}
 	}
 

@@ -22,8 +22,11 @@ const (
 	// AvgToolCallsPerTurn is the expected average tool calls per turn for autoplay timing.
 	// Database analysis shows actual average is ~3, but we use 10 for safety margin.
 	AvgToolCallsPerTurn = 10
+)
 
+var (
 	// AutoplayInterval is the interval between autoplay turns.
-	// Calculated as: AvgToolCallsPerTurn × GameTickDuration
-	AutoplayInterval = AvgToolCallsPerTurn * GameTickDuration
+	// Calculated as: AvgToolCallsPerTurn × GameTickDuration × 0.75
+	// Per DESIGN.md: "game tick time * max tool calls * .75"
+	AutoplayInterval = time.Duration(float64(AvgToolCallsPerTurn)*GameTickDuration.Seconds()*0.75) * time.Second
 )

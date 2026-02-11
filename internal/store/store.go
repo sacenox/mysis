@@ -9,6 +9,7 @@ import (
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/rs/zerolog/log"
 	"github.com/xonecas/mysis/internal/config"
 	"github.com/xonecas/mysis/internal/provider"
 )
@@ -250,11 +251,19 @@ func (s *Store) SaveMessage(sessionID string, msg provider.Message) error {
 		toolCallID = &msg.ToolCallID
 	}
 
+	// Reasoning: NULL if empty, otherwise the value
+	var reasoning interface{}
+	if msg.Reasoning == "" {
+		reasoning = nil
+	} else {
+		reasoning = msg.Reasoning
+	}
+
 	query := `
 		INSERT INTO messages (session_id, role, content, tool_call_id, tool_calls, reasoning)
-		VALUES (?, ?, ?, ?, ?, NULL)
+		VALUES (?, ?, ?, ?, ?, ?)
 	`
-	_, err := s.db.Exec(query, sessionID, msg.Role, msg.Content, toolCallID, toolCallsJSON)
+	_, err := s.db.Exec(query, sessionID, msg.Role, msg.Content, toolCallID, toolCallsJSON, reasoning)
 	if err != nil {
 		return fmt.Errorf("save message: %w", err)
 	}
@@ -266,7 +275,7 @@ func (s *Store) SaveMessage(sessionID string, msg provider.Message) error {
 // LoadMessages retrieves all messages for a session.
 func (s *Store) LoadMessages(sessionID string) ([]provider.Message, error) {
 	query := `
-		SELECT role, content, tool_call_id, tool_calls, reasoning
+		SELECT role, content, tool_call_id, tool_calls, reasoning, created_at
 		FROM messages
 		WHERE session_id = ?
 		ORDER BY created_at ASC
@@ -284,9 +293,17 @@ func (s *Store) LoadMessages(sessionID string) ([]provider.Message, error) {
 		var toolCallID sql.NullString
 		var toolCallsJSON sql.NullString
 		var reasoning sql.NullString
+		var createdAt string
 
-		if err := rows.Scan(&msg.Role, &msg.Content, &toolCallID, &toolCallsJSON, &reasoning); err != nil {
+		if err := rows.Scan(&msg.Role, &msg.Content, &toolCallID, &toolCallsJSON, &reasoning, &createdAt); err != nil {
 			return nil, fmt.Errorf("scan message: %w", err)
+		}
+
+		// Parse timestamp (SQLite CURRENT_TIMESTAMP uses ISO 8601 / RFC3339)
+		if t, err := time.Parse(time.RFC3339, createdAt); err == nil {
+			msg.CreatedAt = t
+		} else {
+			log.Warn().Err(err).Str("timestamp", createdAt).Msg("Failed to parse message timestamp")
 		}
 
 		if toolCallID.Valid {
@@ -297,6 +314,10 @@ func (s *Store) LoadMessages(sessionID string) ([]provider.Message, error) {
 			if err := json.Unmarshal([]byte(toolCallsJSON.String), &msg.ToolCalls); err != nil {
 				return nil, fmt.Errorf("unmarshal tool calls: %w", err)
 			}
+		}
+
+		if reasoning.Valid {
+			msg.Reasoning = reasoning.String
 		}
 
 		messages = append(messages, msg)

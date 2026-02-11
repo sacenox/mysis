@@ -14,12 +14,6 @@ var (
 	ColorBrandDim = lipgloss.Color("#6B00B3") // Dimmed purple for subtle accents
 	ColorTealDim  = lipgloss.Color("#00AA99") // Dimmed teal
 
-	// Role colors
-	ColorUser      = lipgloss.Color("#00FF66") // Bright green for user messages
-	ColorAssistant = lipgloss.Color("#FF00CC") // Magenta/pink for assistant
-	ColorSystem    = lipgloss.Color("#00CCFF") // Cyan for system messages
-	ColorTool      = lipgloss.Color("#FFCC00") // Yellow/gold for tool calls
-
 	// Semantic colors
 	ColorError   = lipgloss.Color("#FF3366") // Error red-pink
 	ColorSuccess = lipgloss.Color("#00FF66") // Success green
@@ -30,6 +24,12 @@ var (
 	ColorBgAlt   = lipgloss.Color("#101018") // Slightly lighter
 	ColorBgPanel = lipgloss.Color("#14141F") // Panel background
 	ColorBorder  = lipgloss.Color("#2A2A55") // Purple-tinted border
+
+	// Role colors
+	ColorUser      = ColorTeal
+	ColorAssistant = ColorTealDim
+	ColorSystem    = ColorTealDim
+	ColorTool      = ColorBrandDim
 )
 
 // Base styles

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -42,11 +43,20 @@ func Run(version string) error {
 
 	// Initialize logging
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
-	if flags.Debug {
-		zerolog.SetGlobalLevel(zerolog.DebugLevel)
+
+	// In TUI mode, log to file instead of stderr to avoid collision
+	if flags.TUI {
+		if err := setupFileLogging(flags.Debug); err != nil {
+			return fmt.Errorf("failed to setup file logging: %w", err)
+		}
 	} else {
-		zerolog.SetGlobalLevel(zerolog.InfoLevel)
+		// CLI mode: log to stderr
+		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+		if flags.Debug {
+			zerolog.SetGlobalLevel(zerolog.DebugLevel)
+		} else {
+			zerolog.SetGlobalLevel(zerolog.InfoLevel)
+		}
 	}
 
 	// Check config path
@@ -183,10 +193,16 @@ func Run(version string) error {
 		}
 	}
 
-	// Print welcome message
+	// Check if TUI mode requested
+	if flags.TUI {
+		// Use TUI mode
+		return runTUI(ctx, sessionMgr, sessionID, prov, proxy, tools, history)
+	}
+
+	// Print welcome message (CLI mode only)
 	printWelcome(selectedProvider, selectedModel, len(tools), sessionInfo)
 
-	// Start conversation loop
+	// Start conversation loop (CLI mode)
 	app := &App{
 		provider:   prov,
 		proxy:      proxy,
@@ -252,8 +268,9 @@ func (app *App) runLoop(ctx context.Context) error {
 
 		// Add user message to history
 		userMsg := provider.Message{
-			Role:    "user",
-			Content: input,
+			Role:      "user",
+			Content:   input,
+			CreatedAt: time.Now(),
 		}
 		app.history = append(app.history, userMsg)
 
@@ -436,4 +453,61 @@ func historyHasSystemPrompt(history []provider.Message, content string) bool {
 func prependSystemPrompt(history []provider.Message, content string) []provider.Message {
 	systemMsg := provider.Message{Role: "system", Content: content}
 	return append([]provider.Message{systemMsg}, history...)
+}
+
+// setupFileLogging configures zerolog to write to a file in the config directory.
+func setupFileLogging(debug bool) error {
+	// Get data directory
+	dataDir, err := config.DataDir()
+	if err != nil {
+		return fmt.Errorf("get data directory: %w", err)
+	}
+
+	// Create logs directory
+	logDir := filepath.Join(dataDir, "logs")
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		return fmt.Errorf("create logs directory: %w", err)
+	}
+
+	// Create log file with timestamp
+	logFile := filepath.Join(logDir, "mysis.log")
+	file, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		return fmt.Errorf("open log file: %w", err)
+	}
+
+	// Set up multi-writer: file (JSON) + console writer for debugging
+	var writers []io.Writer
+
+	// Always write JSON to file
+	writers = append(writers, file)
+
+	// In debug mode, also write human-readable logs to a separate debug file
+	if debug {
+		debugFile := filepath.Join(logDir, "mysis-debug.log")
+		debugFileWriter, err := os.OpenFile(debugFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		if err != nil {
+			return fmt.Errorf("open debug log file: %w", err)
+		}
+		consoleWriter := zerolog.ConsoleWriter{Out: debugFileWriter, TimeFormat: time.RFC3339}
+		writers = append(writers, consoleWriter)
+	}
+
+	// Configure logger
+	multi := io.MultiWriter(writers...)
+	log.Logger = zerolog.New(multi).With().Timestamp().Logger()
+
+	// Set log level
+	if debug {
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	} else {
+		zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	}
+
+	log.Info().
+		Str("log_file", logFile).
+		Bool("debug", debug).
+		Msg("File logging initialized for TUI mode")
+
+	return nil
 }

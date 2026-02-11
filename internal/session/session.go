@@ -124,10 +124,15 @@ func (m *Manager) SelectProvider(cfg *config.Config, sessionName, providerFlag s
 	// If provider not determined from session, use flag or default
 	selectedProvider = providerFlag
 	if selectedProvider == "" {
-		// Use default provider from config (first one)
-		for name := range cfg.Providers {
-			selectedProvider = name
-			break
+		// Use default provider from config
+		if cfg.DefaultProvider != "" {
+			selectedProvider = cfg.DefaultProvider
+		} else {
+			// Fallback: use first provider (non-deterministic for backwards compatibility)
+			for name := range cfg.Providers {
+				selectedProvider = name
+				break
+			}
 		}
 	}
 
