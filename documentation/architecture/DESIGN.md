@@ -1,7 +1,5 @@
 # Mysis Design
 
-## CLI - Lightweight, simpler output, lot's of raw (human readable) data
-
 A fully featured agentic interface for Spacemolt, themed like a mysis from [Zoea Nova](//TODO).
 
 **Spacemolt Game docs:**
@@ -11,7 +9,7 @@ A fully featured agentic interface for Spacemolt, themed like a mysis from [Zoea
 
 ### Features
 
-**Agentic conversation:** Normal agent conversation. User types in stdin, agentic response is printed above. We should show thinking, tool calls (simplified, called, success, failure), and obviously replies. No advanced context management. Use brand coloring output for highlight.
+**Agentic conversation:** Normal agent conversation. User types in, agentic response replies. We should show thinking, tool calls (simplified, called, success, failure), and obviously replies. Use brand coloring output for highlight. Context is truncated and compressed.
 
 **In-conversation commands:**
 
@@ -25,13 +23,19 @@ A fully featured agentic interface for Spacemolt, themed like a mysis from [Zoea
 
 - `-p` `--p` for a provider from the config. If param is not there use default from config. If there is no config exit with error
 - Session management `-s`
+- Launches with cli by default `-t` for TUI display
+- `-f` specifies markdown file to use as system prompt
 
 **MCP tools:**
 
 - `save_credentials(username, password)` / `get_credentials` - Simple tools to save username/password to a local sqlite database in the config file folder.
 - The session id for the mysis saving the pair, we inject, **DO NOT MAKE IT AN ARGUMENT FOR THE AGENTS**
 
-# TUI - Not a replacement, an augmentation.
+## CLI - Lightweight
+
+Simpler output, lot's of raw (human readable) data. Same functionality, runs with any terminal. Type in stdin your messages, output comes out above.
+
+# TUI - Not a replacement, an option.
 
 Same UI as CLI: simple, with a permanent input line and the conversation log.
 
@@ -107,19 +111,7 @@ Animation Sequences:
 - LLM: ◉ ◎ ○ ◌ → ends at ◌ (empty circle)
 - MCP: ◐ ◓ ◑ ◒ → ends at ○ (circle/dot)
 
-#### Bonus Features (Not in Spec originally)
-
-Implemented beyond specification:
-
-- History compression (saves tokens)
-- TUI mode (1,670 lines - complete terminal UI)
-- List sessions (--list-sessions)
-- Delete sessions (--delete-session)
-- System prompt from file (-f/--file)
-- Debug logging (-d/--debug)
-
 # TODO:
 
-- blinking cursor?
 - Session setup screen
 - Game state sidebar, pretty, game like, retro.

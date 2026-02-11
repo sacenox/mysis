@@ -9,8 +9,8 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/xonecas/mysis/internal/cli"
 	"github.com/xonecas/mysis/internal/config"
+	"github.com/xonecas/mysis/internal/features"
 	"github.com/xonecas/mysis/internal/mcp"
-	"github.com/xonecas/mysis/internal/provider"
 	"github.com/xonecas/mysis/internal/session"
 	"github.com/xonecas/mysis/internal/store"
 	"github.com/xonecas/mysis/internal/styles"
@@ -31,7 +31,19 @@ func run() error {
 	ctx := context.Background()
 
 	// Parse flags
-	flags := cli.ParseFlags(Version)
+	flags := features.ParseFlags()
+
+	// Handle version flag
+	if flags.ShowVersion {
+		cli.PrintVersion(Version)
+		os.Exit(0)
+	}
+
+	// Handle help flag
+	if flags.ShowHelp {
+		cli.PrintHelp(Version)
+		os.Exit(0)
+	}
 
 	// Initialize logging
 	if err := setupLogging(flags); err != nil {
@@ -66,10 +78,12 @@ func run() error {
 	// Create session manager
 	sessionMgr := session.NewManager(db)
 
-	// Handle special commands
+	// Handle --list-sessions flag
 	if flags.ListSessions {
 		return cli.ListSessionsCmd(sessionMgr)
 	}
+
+	// Handle --delete-session flag
 	if flags.DeleteSession != "" {
 		return cli.DeleteSessionCmd(sessionMgr, flags.DeleteSession)
 	}
@@ -82,9 +96,9 @@ func run() error {
 	}
 
 	// Initialize provider registry
-	registry := cli.InitializeProviders(cfg, creds)
+	registry := features.InitializeProviders(cfg, creds)
 
-	// Select provider and model
+	// Determine provider and model
 	providerResult, err := sessionMgr.SelectProvider(cfg, flags.SessionName, flags.ProviderName)
 	if err != nil {
 		return err
@@ -104,11 +118,16 @@ func run() error {
 		return fmt.Errorf("failed to create provider: %w", err)
 	}
 	defer prov.Close()
-	log.Info().Str("provider", selectedProvider).Str("model", selectedModel).Msg("Provider initialized")
 
-	// Initialize MCP client and proxy
+	log.Info().
+		Str("provider", selectedProvider).
+		Str("model", selectedModel).
+		Msg("Provider initialized")
+
+	// Initialize MCP client
 	mcpClient := mcp.NewClient(cfg.MCP.Upstream)
 	proxy := mcp.NewProxy(mcpClient)
+
 	if err := proxy.Initialize(ctx); err != nil {
 		log.Warn().Err(err).Msg("Failed to initialize MCP - continuing without game tools")
 	} else {
@@ -138,7 +157,7 @@ func run() error {
 		Int("local_tools", proxy.LocalToolCount()).
 		Msg("Registered local credential tools")
 
-	// Get available tools
+	// Get available tools (includes upstream + local credential tools)
 	tools, err := proxy.ListTools(ctx)
 	if err != nil {
 		log.Warn().Err(err).Msg("Failed to list tools - continuing without tools")
@@ -153,31 +172,33 @@ func run() error {
 		return err
 	}
 
-	// Load system prompt if provided
+	// Load system prompt from markdown file if provided
 	if flags.SystemFile != "" {
-		systemPrompt, err := cli.LoadSystemPromptFromFile(flags.SystemFile)
+		systemPrompt, err := features.LoadSystemPromptFromFile(flags.SystemFile)
 		if err != nil {
 			return err
 		}
-		if !cli.HistoryHasSystemPrompt(history, systemPrompt) {
-			history = cli.PrependSystemPrompt(history, systemPrompt)
+		if !features.HistoryHasSystemPrompt(history, systemPrompt) {
+			history = features.PrependSystemPrompt(history, systemPrompt)
 		}
 	}
 
-	// Delegate to CLI or TUI
+	// Delegate to TUI or CLI based on flag
 	if flags.TUI {
-		return tui.Run(ctx, sessionMgr, sessionID, prov, proxy, tools, history, flags.Autoplay)
+		// Use TUI mode
+		return tui.Start(ctx, sessionMgr, sessionID, prov, proxy, tools, history)
 	}
 
-	return cli.RunCLI(ctx, sessionMgr, sessionID, sessionInfo, prov, proxy, tools, history, flags.Autoplay, selectedProvider, selectedModel)
+	// Use CLI mode
+	return cli.Start(ctx, sessionMgr, sessionID, sessionInfo, prov, proxy, tools, history, flags.Autoplay, selectedProvider, selectedModel)
 }
 
-func setupLogging(flags *cli.Flags) error {
+func setupLogging(flags *features.Flags) error {
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 
 	if flags.TUI {
 		// TUI mode: log to file to avoid collision with UI
-		return cli.SetupFileLogging(flags.Debug)
+		return features.SetupFileLogging(flags.Debug)
 	}
 
 	// CLI mode: log to stderr

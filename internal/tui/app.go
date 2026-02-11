@@ -153,25 +153,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case MessageReceivedMsg:
 		// Add message to conversation (protected by mutex for concurrent access)
-		if m.historyMu != nil {
-			m.historyMu.Lock()
-			m.conversation.AddMessage(msg.Message)
-			m.historyMu.Unlock()
-		} else {
-			m.conversation.AddMessage(msg.Message)
-		}
+		m.historyMu.Lock()
+		m.conversation.AddMessage(msg.Message)
+		m.historyMu.Unlock()
 		cmds = append(cmds, m.statusBar.AnimateInfo())
 		m.statusBar.ClearError()
 
 	case ConversationUpdateMsg:
 		// Trigger re-render of conversation (messages already added elsewhere)
-		if m.historyMu != nil {
-			m.historyMu.Lock()
-			m.conversation.updateContent()
-			m.historyMu.Unlock()
-		} else {
-			m.conversation.updateContent()
-		}
+		m.historyMu.Lock()
+		m.conversation.updateContent()
+		m.historyMu.Unlock()
 		cmds = append(cmds, m.statusBar.AnimateInfo())
 		m.statusBar.ClearError()
 
