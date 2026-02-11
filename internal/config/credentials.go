@@ -27,6 +27,7 @@ func LoadCredentials() (*Credentials, error) {
 		Providers: make(map[string]ProviderCredentials),
 	}
 
+	//nolint:gosec // G304: Path from validated config file
 	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
 		return creds, nil

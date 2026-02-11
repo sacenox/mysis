@@ -53,7 +53,7 @@ func TestOllama_SystemMessagesAnywhere(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"choices": []map[string]interface{}{
 				{
 					"message": map[string]interface{}{
@@ -72,13 +72,14 @@ func TestOllama_SystemMessagesAnywhere(t *testing.T) {
 	ctx := context.Background()
 
 	// System messages at different positions, including consecutive ones
-	messages := []Message{
-		{Role: "system", Content: "You are a helpful assistant."},
-		{Role: "user", Content: "Hello"},
-		{Role: "system", Content: "Be concise in your responses."},
-		{Role: "system", Content: "Use simple language."},
-		{Role: "assistant", Content: "Hi there!"},
-	}
+	messages := make([]Message, 0, 5)
+	messages = append(messages,
+		Message{Role: "system", Content: "You are a helpful assistant."},
+		Message{Role: "user", Content: "Hello"},
+		Message{Role: "system", Content: "Be concise in your responses."},
+		Message{Role: "system", Content: "Use simple language."},
+		Message{Role: "assistant", Content: "Hi there!"},
+	)
 
 	_, err := provider.Chat(ctx, messages)
 	if err != nil {
@@ -132,7 +133,7 @@ func TestOllama_ConsecutiveSystemMessagesMerge(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"choices": []map[string]interface{}{
 				{
 					"message": map[string]interface{}{
@@ -150,12 +151,13 @@ func TestOllama_ConsecutiveSystemMessagesMerge(t *testing.T) {
 	ctx := context.Background()
 
 	// Three consecutive system messages followed by user message
-	messages := []Message{
-		{Role: "system", Content: "This is instruction one."},
-		{Role: "system", Content: "This is instruction two."},
-		{Role: "system", Content: "This is instruction three."},
-		{Role: "user", Content: "Hello"},
-	}
+	messages := make([]Message, 0, 4)
+	messages = append(messages,
+		Message{Role: "system", Content: "This is instruction one."},
+		Message{Role: "system", Content: "This is instruction two."},
+		Message{Role: "system", Content: "This is instruction three."},
+		Message{Role: "user", Content: "Hello"},
+	)
 
 	_, err := provider.Chat(ctx, messages)
 	if err != nil {
@@ -204,7 +206,7 @@ func TestOllama_ToolCalls(t *testing.T) {
 				t.Errorf("expected tool type=function, got %v", tool["type"])
 			}
 
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"choices": []map[string]interface{}{
 					{
 						"message": map[string]interface{}{
@@ -242,7 +244,7 @@ func TestOllama_ToolCalls(t *testing.T) {
 				t.Error("expected tool result message in second request")
 			}
 
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"choices": []map[string]interface{}{
 					{
 						"message": map[string]interface{}{
@@ -269,9 +271,8 @@ func TestOllama_ToolCalls(t *testing.T) {
 		},
 	}
 
-	messages := []Message{
-		{Role: "user", Content: "What is 5 plus 3?"},
-	}
+	messages := make([]Message, 0, 1)
+	messages = append(messages, Message{Role: "user", Content: "What is 5 plus 3?"})
 
 	resp1, err := provider.ChatWithTools(ctx, messages, tools)
 	if err != nil {
@@ -346,7 +347,7 @@ func TestOllama_ReasoningField(t *testing.T) {
 					},
 				}
 
-				json.NewEncoder(w).Encode(response)
+				_ = json.NewEncoder(w).Encode(response)
 			}))
 			defer server.Close()
 
@@ -354,9 +355,8 @@ func TestOllama_ReasoningField(t *testing.T) {
 			provider := NewOllama(baseURL, "test-model")
 			ctx := context.Background()
 
-			messages := []Message{
-				{Role: "user", Content: "Question?"},
-			}
+			messages := make([]Message, 0, 1)
+			messages = append(messages, Message{Role: "user", Content: "Question?"})
 
 			tools := []Tool{
 				{Name: "dummy", Description: "Dummy tool"},
@@ -398,7 +398,7 @@ func TestOllama_SystemMessagesAtEnd(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"choices": []map[string]interface{}{
 				{
 					"message": map[string]interface{}{
@@ -416,11 +416,12 @@ func TestOllama_SystemMessagesAtEnd(t *testing.T) {
 	ctx := context.Background()
 
 	// System message at the end
-	messages := []Message{
-		{Role: "user", Content: "Hello"},
-		{Role: "assistant", Content: "Hi!"},
-		{Role: "system", Content: "Here's a final instruction."},
-	}
+	messages := make([]Message, 0, 3)
+	messages = append(messages,
+		Message{Role: "user", Content: "Hello"},
+		Message{Role: "assistant", Content: "Hi!"},
+		Message{Role: "system", Content: "Here's a final instruction."},
+	)
 
 	resp, err := provider.Chat(ctx, messages)
 	if err != nil {

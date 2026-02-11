@@ -139,25 +139,14 @@ func (r *Runner) handleSendMessage(content string) error {
 			}
 		}()
 		// Use background context for normal messages (no cancellation needed)
-		r.processTurn(context.Background(), userMsg, historyCopy)
+		r.processTurn(context.Background(), historyCopy)
 	}()
 
 	return nil
 }
 
-// getConversationHistory returns a safe copy of the conversation messages.
-func (r *Runner) getConversationHistory() []provider.Message {
-	r.historyMu.Lock()
-	defer r.historyMu.Unlock()
-
-	// Make a safe copy of the history
-	history := make([]provider.Message, len(r.history))
-	copy(history, r.history)
-	return history
-}
-
 // processTurn handles LLM processing and tool calls.
-func (r *Runner) processTurn(ctx context.Context, userMsg provider.Message, history []provider.Message) {
+func (r *Runner) processTurn(ctx context.Context, history []provider.Message) {
 
 	// User message is already in history (added synchronously in handleSendMessage)
 	// No need to append it again
@@ -300,7 +289,7 @@ func (r *Runner) initAutoplayService() {
 			// Process turn (synchronously for autoplay to prevent overlapping turns)
 			// Use background context - let the current turn complete even if autoplay is stopped
 			// The autoplay loop will check ctx.Done() after this returns
-			r.processTurn(context.Background(), userMsg, historyCopy)
+			r.processTurn(context.Background(), historyCopy)
 
 			return nil
 		},
@@ -327,7 +316,7 @@ func (r *Runner) handleAutoplayCommand(cmd string) error {
 
 	// Start autoplay - need a message
 	if len(parts) < 2 {
-		return fmt.Errorf("Usage: /autoplay <message> or /autoplay stop")
+		return fmt.Errorf("usage: /autoplay <message> or /autoplay stop")
 	}
 
 	message := strings.Join(parts[1:], " ")

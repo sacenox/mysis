@@ -107,7 +107,7 @@ func TestGetCredentialsTool(t *testing.T) {
 
 	t.Run("credentials exist", func(t *testing.T) {
 		// Save credentials first
-		store.SaveCredentials(sessionID, "player2", "pass456")
+		_ = store.SaveCredentials(sessionID, "player2", "pass456")
 
 		result, err := handler(context.Background(), json.RawMessage("{}"))
 		if err != nil {
@@ -183,19 +183,19 @@ func TestSessionIsolation(t *testing.T) {
 	session1 := "session-1"
 	handler1 := MakeSaveCredentialsHandler(store, session1)
 	args1, _ := json.Marshal(SaveCredentialsArgs{Username: "user1", Password: "pass1"})
-	handler1(context.Background(), args1)
+	_, _ = handler1(context.Background(), args1)
 
 	// Session 2
 	session2 := "session-2"
 	handler2 := MakeSaveCredentialsHandler(store, session2)
 	args2, _ := json.Marshal(SaveCredentialsArgs{Username: "user2", Password: "pass2"})
-	handler2(context.Background(), args2)
+	_, _ = handler2(context.Background(), args2)
 
 	// Verify session 1 credentials
 	getHandler1 := MakeGetCredentialsHandler(store, session1)
 	result1, _ := getHandler1(context.Background(), json.RawMessage("{}"))
 	var creds1 GetCredentialsResult
-	json.Unmarshal([]byte(result1.Content[0].Text), &creds1)
+	_ = json.Unmarshal([]byte(result1.Content[0].Text), &creds1)
 
 	if creds1.Username != "user1" {
 		t.Errorf("Session 1: Username = %q, want %q", creds1.Username, "user1")
@@ -205,7 +205,7 @@ func TestSessionIsolation(t *testing.T) {
 	getHandler2 := MakeGetCredentialsHandler(store, session2)
 	result2, _ := getHandler2(context.Background(), json.RawMessage("{}"))
 	var creds2 GetCredentialsResult
-	json.Unmarshal([]byte(result2.Content[0].Text), &creds2)
+	_ = json.Unmarshal([]byte(result2.Content[0].Text), &creds2)
 
 	if creds2.Username != "user2" {
 		t.Errorf("Session 2: Username = %q, want %q", creds2.Username, "user2")

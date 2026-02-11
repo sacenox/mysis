@@ -247,7 +247,9 @@ func (p *OllamaProvider) createChatCompletion(ctx context.Context, req ollamaCha
 		if resp.StatusCode == 429 || resp.StatusCode == 500 || resp.StatusCode == 502 ||
 			resp.StatusCode == 503 || resp.StatusCode == 504 {
 			payload, _ := io.ReadAll(resp.Body)
-			resp.Body.Close()
+			if err := resp.Body.Close(); err != nil {
+				log.Warn().Err(err).Msg("Failed to close response body")
+			}
 			lastErr = fmt.Errorf("chat completion status %d: %s", resp.StatusCode, strings.TrimSpace(string(payload)))
 
 			log.Warn().
@@ -261,7 +263,9 @@ func (p *OllamaProvider) createChatCompletion(ctx context.Context, req ollamaCha
 
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 			payload, _ := io.ReadAll(resp.Body)
-			resp.Body.Close()
+			if err := resp.Body.Close(); err != nil {
+				log.Warn().Err(err).Msg("Failed to close response body")
+			}
 
 			log.Error().
 				Str("provider", "ollama").
@@ -272,10 +276,12 @@ func (p *OllamaProvider) createChatCompletion(ctx context.Context, req ollamaCha
 			return nil, fmt.Errorf("chat completion status %d: %s", resp.StatusCode, strings.TrimSpace(string(payload)))
 		}
 
-		bodyBytes, err := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		if err != nil {
-			return nil, fmt.Errorf("read response body: %w", err)
+		bodyBytes, readErr := io.ReadAll(resp.Body)
+		if err := resp.Body.Close(); err != nil {
+			log.Warn().Err(err).Msg("Failed to close response body")
+		}
+		if readErr != nil {
+			return nil, fmt.Errorf("read response body: %w", readErr)
 		}
 
 		var decoded chatCompletionResponse
@@ -318,7 +324,11 @@ func (p *OllamaProvider) Stream(ctx context.Context, messages []Message) (<-chan
 	ch := make(chan StreamChunk)
 	go func() {
 		defer close(ch)
-		defer stream.Close()
+		defer func() {
+			if err := stream.Close(); err != nil {
+				log.Warn().Err(err).Msg("Failed to close stream")
+			}
+		}()
 
 		for {
 			resp, err := stream.Recv()

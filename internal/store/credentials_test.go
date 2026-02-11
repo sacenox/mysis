@@ -9,7 +9,7 @@ func TestCredentialStorage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to open store: %v", err)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 
 	sessionID := "test-cred-session"
 
@@ -17,7 +17,7 @@ func TestCredentialStorage(t *testing.T) {
 	if err := store.CreateSession(sessionID, "opencode", "test-model", nil); err != nil {
 		t.Fatalf("failed to create session: %v", err)
 	}
-	defer store.DeleteSession(sessionID)
+	defer func() { _ = store.DeleteSession(sessionID) }()
 
 	t.Run("save and retrieve credentials", func(t *testing.T) {
 		username := "testuser"
@@ -45,7 +45,7 @@ func TestCredentialStorage(t *testing.T) {
 
 	t.Run("update existing credentials", func(t *testing.T) {
 		// Save initial credentials
-		store.SaveCredentials(sessionID, "user1", "pass1")
+		_ = store.SaveCredentials(sessionID, "user1", "pass1")
 
 		// Update credentials
 		newUsername := "user2"
@@ -85,19 +85,19 @@ func TestCredentialStorage(t *testing.T) {
 	t.Run("credentials deleted with session", func(t *testing.T) {
 		// Create new session
 		tempSession := "temp-session"
-		store.CreateSession(tempSession, "opencode", "test-model", nil)
+		_ = store.CreateSession(tempSession, "opencode", "test-model", nil)
 
 		// Save credentials
-		store.SaveCredentials(tempSession, "tempuser", "temppass")
+		_ = store.SaveCredentials(tempSession, "tempuser", "temppass")
 
 		// Verify credentials exist
-		username, password, _ := store.GetCredentials(tempSession)
+		username, _, _ := store.GetCredentials(tempSession)
 		if username != "tempuser" {
 			t.Fatal("credentials not saved")
 		}
 
 		// Delete session
-		store.DeleteSession(tempSession)
+		_ = store.DeleteSession(tempSession)
 
 		// Verify credentials are gone
 		username, password, err := store.GetCredentials(tempSession)
@@ -116,20 +116,20 @@ func TestCredentialSessionIsolation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to open store: %v", err)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 
 	session1 := "session-1"
 	session2 := "session-2"
 
 	// Create sessions
-	store.CreateSession(session1, "opencode", "test-model", nil)
-	store.CreateSession(session2, "opencode", "test-model", nil)
-	defer store.DeleteSession(session1)
-	defer store.DeleteSession(session2)
+	_ = store.CreateSession(session1, "opencode", "test-model", nil)
+	_ = store.CreateSession(session2, "opencode", "test-model", nil)
+	defer func() { _ = store.DeleteSession(session1) }()
+	defer func() { _ = store.DeleteSession(session2) }()
 
 	// Save different credentials for each session
-	store.SaveCredentials(session1, "user1", "pass1")
-	store.SaveCredentials(session2, "user2", "pass2")
+	_ = store.SaveCredentials(session1, "user1", "pass1")
+	_ = store.SaveCredentials(session2, "user2", "pass2")
 
 	// Verify session 1
 	username1, password1, err := store.GetCredentials(session1)

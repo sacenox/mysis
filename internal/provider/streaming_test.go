@@ -42,7 +42,7 @@ func TestOllamaProvider_Stream(t *testing.T) {
 		}
 
 		for _, chunk := range chunks {
-			fmt.Fprintf(w, "%s\n\n", chunk)
+			_, _ = fmt.Fprintf(w, "%s\n\n", chunk)
 			flusher.Flush()
 			time.Sleep(10 * time.Millisecond) // Simulate streaming delay
 		}
@@ -52,7 +52,8 @@ func TestOllamaProvider_Stream(t *testing.T) {
 	provider := NewOllama(server.URL, "test-model")
 
 	ctx := context.Background()
-	messages := []Message{{Role: "user", Content: "test"}}
+	messages := make([]Message, 0, 1)
+	messages = append(messages, Message{Role: "user", Content: "test"})
 
 	ch, err := provider.Stream(ctx, messages)
 	if err != nil {
@@ -89,7 +90,7 @@ func TestOllamaProvider_Stream_Cancellation(t *testing.T) {
 
 		// Send chunks slowly
 		for i := 0; i < 10; i++ {
-			fmt.Fprintf(w, "data: {\"id\":\"1\",\"object\":\"chat.completion.chunk\",\"created\":1234567890,\"model\":\"test\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"chunk %d\"},\"finish_reason\":null}]}\n\n", i)
+			_, _ = fmt.Fprintf(w, "data: {\"id\":\"1\",\"object\":\"chat.completion.chunk\",\"created\":1234567890,\"model\":\"test\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"chunk %d\"},\"finish_reason\":null}]}\n\n", i)
 			flusher.Flush()
 			time.Sleep(100 * time.Millisecond)
 		}
@@ -100,7 +101,8 @@ func TestOllamaProvider_Stream_Cancellation(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	messages := []Message{{Role: "user", Content: "test"}}
+	messages := make([]Message, 0, 1)
+	messages = append(messages, Message{Role: "user", Content: "test"})
 	ch, err := provider.Stream(ctx, messages)
 	if err != nil {
 		t.Fatalf("Stream() failed: %v", err)
@@ -147,7 +149,7 @@ func TestOllamaProvider_Stream_EmptyChunks(t *testing.T) {
 		}
 
 		for _, chunk := range chunks {
-			fmt.Fprintf(w, "%s\n\n", chunk)
+			_, _ = fmt.Fprintf(w, "%s\n\n", chunk)
 			flusher.Flush()
 		}
 	}))
@@ -156,7 +158,8 @@ func TestOllamaProvider_Stream_EmptyChunks(t *testing.T) {
 	provider := NewOllama(server.URL, "test")
 
 	ctx := context.Background()
-	messages := []Message{{Role: "user", Content: "test"}}
+	messages := make([]Message, 0, 1)
+	messages = append(messages, Message{Role: "user", Content: "test"})
 
 	ch, err := provider.Stream(ctx, messages)
 	if err != nil {
@@ -184,14 +187,15 @@ func TestOllamaProvider_Stream_EmptyChunks(t *testing.T) {
 func TestOllamaProvider_Stream_ServerError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Internal server error"))
+		_, _ = w.Write([]byte("Internal server error"))
 	}))
 	defer server.Close()
 
 	provider := NewOllama(server.URL, "test")
 
 	ctx := context.Background()
-	messages := []Message{{Role: "user", Content: "test"}}
+	messages := make([]Message, 0, 1)
+	messages = append(messages, Message{Role: "user", Content: "test"})
 
 	_, err := provider.Stream(ctx, messages)
 	if err == nil {
@@ -225,7 +229,7 @@ func TestOpenCodeProvider_Stream(t *testing.T) {
 		}
 
 		for _, chunk := range chunks {
-			fmt.Fprintf(w, "%s\n\n", chunk)
+			_, _ = fmt.Fprintf(w, "%s\n\n", chunk)
 			flusher.Flush()
 		}
 	}))
@@ -234,7 +238,8 @@ func TestOpenCodeProvider_Stream(t *testing.T) {
 	provider := NewOpenCode(server.URL, "test-model", "test-api-key")
 
 	ctx := context.Background()
-	messages := []Message{{Role: "user", Content: "test"}}
+	messages := make([]Message, 0, 1)
+	messages = append(messages, Message{Role: "user", Content: "test"})
 
 	ch, err := provider.Stream(ctx, messages)
 	if err != nil {
@@ -270,7 +275,7 @@ func TestOpenCodeProvider_Stream_Cancellation(t *testing.T) {
 		flusher := w.(http.Flusher)
 
 		for i := 0; i < 10; i++ {
-			fmt.Fprintf(w, "data: {\"id\":\"1\",\"object\":\"chat.completion.chunk\",\"created\":1234567890,\"model\":\"test\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"chunk %d\"},\"finish_reason\":null}]}\n\n", i)
+			_, _ = fmt.Fprintf(w, "data: {\"id\":\"1\",\"object\":\"chat.completion.chunk\",\"created\":1234567890,\"model\":\"test\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"chunk %d\"},\"finish_reason\":null}]}\n\n", i)
 			flusher.Flush()
 			time.Sleep(100 * time.Millisecond)
 		}
@@ -282,7 +287,8 @@ func TestOpenCodeProvider_Stream_Cancellation(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
 	defer cancel()
 
-	messages := []Message{{Role: "user", Content: "test"}}
+	messages := make([]Message, 0, 1)
+	messages = append(messages, Message{Role: "user", Content: "test"})
 	ch, err := provider.Stream(ctx, messages)
 	if err != nil {
 		t.Fatalf("Stream() failed: %v", err)
@@ -346,9 +352,10 @@ func TestOllamaProvider_Stream_NoChoices(t *testing.T) {
 		flusher := w.(http.Flusher)
 
 		// Send chunk with empty choices array
-		fmt.Fprintf(w, "data: {\"id\":\"1\",\"object\":\"chat.completion.chunk\",\"created\":1234567890,\"model\":\"test\",\"choices\":[]}\n\n")
+		_, _ = fmt.Fprintf(w, "data: {\"id\":\"1\",\"object\":\"chat.completion.chunk\",\"created\":1234567890,\"model\":\"test\",\"choices\":[]}\n\n")
 		flusher.Flush()
-		fmt.Fprintf(w, "data: [DONE]\n\n")
+
+		_, _ = fmt.Fprintf(w, "data: [DONE]\n\n")
 		flusher.Flush()
 	}))
 	defer server.Close()
@@ -399,7 +406,8 @@ func TestProvider_Stream_Interface(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Verify Stream method exists and returns correct types
 			ctx := context.Background()
-			messages := []Message{{Role: "user", Content: "test"}}
+			messages := make([]Message, 0, 1)
+			messages = append(messages, Message{Role: "user", Content: "test"})
 
 			// This will fail if server is not available, but that's expected
 			// We're just verifying the method signature

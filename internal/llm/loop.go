@@ -118,10 +118,7 @@ func ProcessTurn(ctx context.Context, opts ProcessTurnOptions) error {
 		}
 
 		// Execute each tool call and update history
-		toolResults, err := executeToolCalls(ctx, opts.Proxy, resp.ToolCalls, opts.OnMessage, opts.SuppressOutput)
-		if err != nil {
-			return err
-		}
+		toolResults := executeToolCalls(ctx, opts.Proxy, resp.ToolCalls, opts.OnMessage, opts.SuppressOutput)
 		opts.History = append(opts.History, toolResults...)
 
 		// Continue loop to let LLM process tool results
@@ -146,8 +143,8 @@ func displayReasoning(reasoning string) {
 
 // executeToolCalls executes a list of tool calls and adds results to history.
 // Returns the list of tool result messages that were added.
-func executeToolCalls(ctx context.Context, proxy *mcp.Proxy, toolCalls []provider.ToolCall, onMessage MessageCallback, suppressOutput bool) ([]provider.Message, error) {
-	var toolResults []provider.Message
+func executeToolCalls(ctx context.Context, proxy *mcp.Proxy, toolCalls []provider.ToolCall, onMessage MessageCallback, suppressOutput bool) []provider.Message {
+	toolResults := make([]provider.Message, 0, len(toolCalls))
 
 	for _, toolCall := range toolCalls {
 		if !suppressOutput {
@@ -220,7 +217,7 @@ func executeToolCalls(ctx context.Context, proxy *mcp.Proxy, toolCalls []provide
 		toolResults = append(toolResults, toolMsg)
 	}
 
-	return toolResults, nil
+	return toolResults
 }
 
 // displayToolArguments shows tool arguments in a truncated format.

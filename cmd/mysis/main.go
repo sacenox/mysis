@@ -73,7 +73,11 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("failed to open database: %w", err)
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Error().Err(err).Msg("Failed to close database")
+		}
+	}()
 
 	// Create session manager
 	sessionMgr := session.NewManager(db)
@@ -117,7 +121,11 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("failed to create provider: %w", err)
 	}
-	defer prov.Close()
+	defer func() {
+		if err := prov.Close(); err != nil {
+			log.Error().Err(err).Msg("Failed to close provider")
+		}
+	}()
 
 	log.Info().
 		Str("provider", selectedProvider).
@@ -133,7 +141,11 @@ func run() error {
 	} else {
 		log.Info().Str("upstream", cfg.MCP.Upstream).Msg("MCP proxy initialized")
 	}
-	defer proxy.Close()
+	defer func() {
+		if err := proxy.Close(); err != nil {
+			log.Error().Err(err).Msg("Failed to close MCP proxy")
+		}
+	}()
 
 	// Initialize or resume session
 	sessionResult, err := sessionMgr.Initialize(flags.SessionName, selectedProvider, selectedModel)

@@ -45,7 +45,7 @@ func TestOpenCode_SystemPromptOnly(t *testing.T) {
 
 		// Return mock response
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"choices": []map[string]interface{}{
 				{
 					"message": map[string]interface{}{
@@ -62,9 +62,8 @@ func TestOpenCode_SystemPromptOnly(t *testing.T) {
 	provider := NewOpenCode(server.URL, "test-model", "test-key")
 
 	// Send only system messages
-	messages := []Message{
-		{Role: "system", Content: "You are a helpful assistant."},
-	}
+	messages := make([]Message, 0, 1)
+	messages = append(messages, Message{Role: "system", Content: "You are a helpful assistant."})
 
 	ctx := context.Background()
 	response, err := provider.Chat(ctx, messages)
@@ -114,7 +113,7 @@ func TestOpenCode_ToolCallsAndResults(t *testing.T) {
 			}
 
 			// Return tool call response
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"choices": []map[string]interface{}{
 					{
 						"message": map[string]interface{}{
@@ -153,7 +152,7 @@ func TestOpenCode_ToolCallsAndResults(t *testing.T) {
 			}
 
 			// Return final response
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"choices": []map[string]interface{}{
 					{
 						"message": map[string]interface{}{
@@ -179,9 +178,8 @@ func TestOpenCode_ToolCallsAndResults(t *testing.T) {
 		},
 	}
 
-	messages := []Message{
-		{Role: "user", Content: "What's the weather in NYC?"},
-	}
+	messages := make([]Message, 0, 1)
+	messages = append(messages, Message{Role: "user", Content: "What's the weather in NYC?"})
 
 	resp1, err := provider.ChatWithTools(ctx, messages, tools)
 	if err != nil {
@@ -242,9 +240,8 @@ func TestOpenCode_InvalidToolSchema(t *testing.T) {
 		},
 	}
 
-	messages := []Message{
-		{Role: "user", Content: "Do something"},
-	}
+	messages := make([]Message, 0, 1)
+	messages = append(messages, Message{Role: "user", Content: "Do something"})
 
 	_, err := provider.ChatWithTools(ctx, messages, tools)
 	if err == nil {
@@ -298,7 +295,7 @@ func TestOpenCode_MultipleSystemMessages(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"choices": []map[string]interface{}{
 				{
 					"message": map[string]interface{}{
@@ -315,12 +312,13 @@ func TestOpenCode_MultipleSystemMessages(t *testing.T) {
 	ctx := context.Background()
 
 	// Send multiple system messages scattered in conversation
-	messages := []Message{
-		{Role: "system", Content: "You are a helpful assistant."},
-		{Role: "user", Content: "Hello"},
-		{Role: "system", Content: "Be concise in your responses."},
-		{Role: "assistant", Content: "Hi"},
-	}
+	messages := make([]Message, 0, 4)
+	messages = append(messages,
+		Message{Role: "system", Content: "You are a helpful assistant."},
+		Message{Role: "user", Content: "Hello"},
+		Message{Role: "system", Content: "Be concise in your responses."},
+		Message{Role: "assistant", Content: "Hi"},
+	)
 
 	_, err := provider.Chat(ctx, messages)
 	if err != nil {
@@ -347,7 +345,7 @@ func TestOpenCode_PreservesConversationHistory(t *testing.T) {
 			} `json:"messages"`
 			Stream bool `json:"stream"`
 		}
-		json.NewDecoder(r.Body).Decode(&req)
+		_ = json.NewDecoder(r.Body).Decode(&req)
 
 		// Verify Stream is false
 		if req.Stream {
@@ -378,7 +376,7 @@ func TestOpenCode_PreservesConversationHistory(t *testing.T) {
 
 		// Return valid response
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"choices": []map[string]interface{}{
 				{
 					"message": map[string]interface{}{
@@ -395,14 +393,15 @@ func TestOpenCode_PreservesConversationHistory(t *testing.T) {
 	provider := NewOpenCodeWithTemp("opencode_zen", server.URL, "test-model", "test-key", 0.7)
 
 	// Create messages simulating the failure scenario
-	messages := []Message{
-		{Role: "system", Content: "System prompt 1"},
-		{Role: "user", Content: "User message 1"},
-		{Role: "assistant", Content: "Assistant response 1"},
-		{Role: "system", Content: "Context update 1"},
-		{Role: "user", Content: "User message 2"},
-		{Role: "assistant", Content: "Assistant response 2"},
-	}
+	messages := make([]Message, 0, 6)
+	messages = append(messages,
+		Message{Role: "system", Content: "System prompt 1"},
+		Message{Role: "user", Content: "User message 1"},
+		Message{Role: "assistant", Content: "Assistant response 1"},
+		Message{Role: "system", Content: "Context update 1"},
+		Message{Role: "user", Content: "User message 2"},
+		Message{Role: "assistant", Content: "Assistant response 2"},
+	)
 
 	// Call Chat
 	_, err := provider.Chat(context.Background(), messages)
@@ -420,7 +419,7 @@ func TestOpenCode_StreamParameterSetCorrectly(t *testing.T) {
 		var req struct {
 			Stream bool `json:"stream"`
 		}
-		json.NewDecoder(r.Body).Decode(&req)
+		_ = json.NewDecoder(r.Body).Decode(&req)
 
 		// THIS IS THE CRITICAL TEST
 		if req.Stream {
@@ -428,7 +427,7 @@ func TestOpenCode_StreamParameterSetCorrectly(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"choices": []map[string]interface{}{
 				{"message": map[string]interface{}{"role": "assistant", "content": "ok"}},
 			},
@@ -438,9 +437,8 @@ func TestOpenCode_StreamParameterSetCorrectly(t *testing.T) {
 
 	provider := NewOpenCodeWithTemp("opencode_zen", server.URL, "test-model", "test-key", 0.7)
 
-	messages := []Message{
-		{Role: "user", Content: "Test"},
-	}
+	messages := make([]Message, 0, 1)
+	messages = append(messages, Message{Role: "user", Content: "Test"})
 
 	_, err := provider.Chat(context.Background(), messages)
 	if err != nil {

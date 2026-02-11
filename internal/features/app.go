@@ -21,12 +21,13 @@ func InitializeProviders(cfg *config.Config, creds *config.Credentials) *provide
 
 	for name, provCfg := range cfg.Providers {
 		// Detect provider type based on endpoint
-		if strings.Contains(provCfg.Endpoint, "localhost:11434") || strings.Contains(provCfg.Endpoint, "/ollama") {
+		switch {
+		case strings.Contains(provCfg.Endpoint, "localhost:11434"), strings.Contains(provCfg.Endpoint, "/ollama"):
 			// Ollama provider
 			factory := provider.NewOllamaFactory(name, provCfg.Endpoint)
 			registry.RegisterFactory(name, factory)
 			log.Debug().Str("name", name).Str("endpoint", provCfg.Endpoint).Msg("Registered Ollama provider")
-		} else if strings.Contains(provCfg.Endpoint, "opencode.ai") {
+		case strings.Contains(provCfg.Endpoint, "opencode.ai"):
 			// OpenCode Zen provider
 			keyName := provCfg.APIKeyName
 			if keyName == "" {
@@ -40,7 +41,7 @@ func InitializeProviders(cfg *config.Config, creds *config.Credentials) *provide
 			factory := provider.NewOpenCodeFactory(name, provCfg.Endpoint, apiKey)
 			registry.RegisterFactory(name, factory)
 			log.Debug().Str("name", name).Str("endpoint", provCfg.Endpoint).Msg("Registered OpenCode provider")
-		} else {
+		default:
 			log.Warn().Str("name", name).Str("endpoint", provCfg.Endpoint).Msg("Unknown provider type")
 		}
 	}
@@ -55,6 +56,7 @@ func LoadSystemPromptFromFile(path string) (string, error) {
 		return "", fmt.Errorf("system prompt file must be markdown (.md or .markdown): %s", path)
 	}
 
+	//nolint:gosec // G304: Path from validated config file
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return "", fmt.Errorf("read system prompt file: %w", err)
@@ -95,12 +97,13 @@ func SetupFileLogging(debug bool) error {
 
 	// Create logs directory
 	logDir := filepath.Join(dataDir, "logs")
-	if err := os.MkdirAll(logDir, 0755); err != nil {
+	if err := os.MkdirAll(logDir, 0750); err != nil {
 		return fmt.Errorf("create logs directory: %w", err)
 	}
 
 	// Create log file
 	logFile := filepath.Join(logDir, "mysis.log")
+	//nolint:gosec // G304: Path from validated config file
 	file, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
 		return fmt.Errorf("open log file: %w", err)
@@ -115,6 +118,7 @@ func SetupFileLogging(debug bool) error {
 	// In debug mode, also write human-readable logs to a separate debug file
 	if debug {
 		debugFile := filepath.Join(logDir, "mysis-debug.log")
+		//nolint:gosec // G304: Debug log file path is constructed from validated data directory
 		debugFileWriter, err := os.OpenFile(debugFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 		if err != nil {
 			return fmt.Errorf("open debug log file: %w", err)

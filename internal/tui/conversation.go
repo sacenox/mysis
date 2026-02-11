@@ -173,10 +173,11 @@ func (c Conversation) renderContent(content string, role string) []string {
 	// Set width to fill the viewport so background extends to edge
 	// No word wrap per design spec: "No word wrap for reasoning, user messages, or agent replies"
 	style := RoleStyle(role).Width(c.width)
-	var lines []string
 
 	// Split by newlines only (no word wrapping)
-	for _, line := range strings.Split(truncated, "\n") {
+	splitLines := strings.Split(truncated, "\n")
+	lines := make([]string, 0, len(splitLines))
+	for _, line := range splitLines {
 		// Render padding + content with full width so background fills line
 		lines = append(lines, style.Render("  "+line))
 	}
@@ -186,7 +187,7 @@ func (c Conversation) renderContent(content string, role string) []string {
 
 // renderToolCalls renders tool calls in a compact format.
 func (c Conversation) renderToolCalls(toolCalls []provider.ToolCall) []string {
-	var lines []string
+	lines := make([]string, 0, len(toolCalls))
 
 	for _, tc := range toolCalls {
 		// Build tool line content
@@ -213,9 +214,8 @@ func (c Conversation) renderToolCalls(toolCalls []provider.ToolCall) []string {
 
 // Update handles viewport updates (scrolling, etc).
 func (c Conversation) Update(msg interface{}) (Conversation, bool) {
-	var cmd interface{}
-	c.viewport, cmd = c.viewport.Update(msg)
-	return c, cmd != nil
+	c.viewport, _ = c.viewport.Update(msg)
+	return c, false
 }
 
 // View renders the conversation viewport.

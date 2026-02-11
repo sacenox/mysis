@@ -88,8 +88,7 @@ func (s StatusBar) tick() tea.Cmd {
 
 // Update handles status bar updates.
 func (s StatusBar) Update(msg tea.Msg) (StatusBar, tea.Cmd) {
-	switch msg.(type) {
-	case StatusBarTickMsg:
+	if _, ok := msg.(StatusBarTickMsg); ok {
 		// Advance animation frame
 		s.currentFrame = (s.currentFrame + 1) % framesPerCycle
 
@@ -336,10 +335,3 @@ var (
 	// MCP: rotating connection, ends at ○ (circle/dot) - purple color for server communication
 	mcpIcons = []string{"◐", "◓", "◑", "◒", "◐", "◓", "◑", "◒", "○", "◌", "○", "○"}
 )
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}

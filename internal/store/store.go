@@ -56,7 +56,7 @@ func Open() (*Store, error) {
 
 	store := &Store{db: db}
 	if err := store.initSchema(); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("init schema: %w", err)
 	}
 
@@ -198,7 +198,7 @@ func (s *Store) ListSessions(limit int) ([]Session, error) {
 	if err != nil {
 		return nil, fmt.Errorf("list sessions: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var sessions []Session
 	for rows.Next() {
@@ -285,7 +285,7 @@ func (s *Store) LoadMessages(sessionID string) ([]provider.Message, error) {
 	if err != nil {
 		return nil, fmt.Errorf("load messages: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var messages []provider.Message
 	for rows.Next() {

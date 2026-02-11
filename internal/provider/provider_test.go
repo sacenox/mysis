@@ -42,7 +42,8 @@ func TestMockProviderChat(t *testing.T) {
 	mock := NewMock("test", "Hello, World!")
 
 	ctx := context.Background()
-	messages := []Message{{Role: "user", Content: "Hi"}}
+	messages := make([]Message, 0, 1)
+	messages = append(messages, Message{Role: "user", Content: "Hi"})
 
 	response, err := mock.Chat(ctx, messages)
 	if err != nil {
@@ -58,7 +59,8 @@ func TestMockProviderChatDelay(t *testing.T) {
 	mock := NewMock("test", "ok").SetDelay(delay)
 
 	ctx := context.Background()
-	messages := []Message{{Role: "user", Content: "Hi"}}
+	messages := make([]Message, 0, 1)
+	messages = append(messages, Message{Role: "user", Content: "Hi"})
 
 	start := time.Now()
 	_, err := mock.Chat(ctx, messages)
@@ -76,7 +78,8 @@ func TestMockProviderChatWithToolsDelay(t *testing.T) {
 	mock := NewMock("test", "ok").SetDelay(delay)
 
 	ctx := context.Background()
-	messages := []Message{{Role: "user", Content: "Hi"}}
+	messages := make([]Message, 0, 1)
+	messages = append(messages, Message{Role: "user", Content: "Hi"})
 
 	start := time.Now()
 	_, err := mock.ChatWithTools(ctx, messages, nil)
@@ -95,7 +98,8 @@ func TestMockProviderChatDelayContextCancel(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
 	defer cancel()
 
-	messages := []Message{{Role: "user", Content: "Hi"}}
+	messages := make([]Message, 0, 1)
+	messages = append(messages, Message{Role: "user", Content: "Hi"})
 	_, err := mock.Chat(ctx, messages)
 	if err == nil {
 		t.Fatal("expected context deadline error")
@@ -107,7 +111,8 @@ func TestMockProviderChatError(t *testing.T) {
 	mock := NewMock("test", "").WithChatError(expectedErr)
 
 	ctx := context.Background()
-	messages := []Message{{Role: "user", Content: "Hi"}}
+	messages := make([]Message, 0, 1)
+	messages = append(messages, Message{Role: "user", Content: "Hi"})
 
 	_, err := mock.Chat(ctx, messages)
 	if !errors.Is(err, expectedErr) {
@@ -119,7 +124,8 @@ func TestMockProviderStream(t *testing.T) {
 	mock := NewMock("test", "Streamed response")
 
 	ctx := context.Background()
-	messages := []Message{{Role: "user", Content: "Hi"}}
+	messages := make([]Message, 0, 1)
+	messages = append(messages, Message{Role: "user", Content: "Hi"})
 
 	ch, err := mock.Stream(ctx, messages)
 	if err != nil {
@@ -152,7 +158,8 @@ func TestMockProviderStreamError(t *testing.T) {
 	mock := NewMock("test", "").WithStreamError(expectedErr)
 
 	ctx := context.Background()
-	messages := []Message{{Role: "user", Content: "Hi"}}
+	messages := make([]Message, 0, 1)
+	messages = append(messages, Message{Role: "user", Content: "Hi"})
 
 	_, err := mock.Stream(ctx, messages)
 	if !errors.Is(err, expectedErr) {
@@ -175,11 +182,12 @@ func TestOpenCodeProviderName(t *testing.T) {
 }
 
 func TestToOpenAIMessages(t *testing.T) {
-	messages := []Message{
-		{Role: "system", Content: "You are helpful."},
-		{Role: "user", Content: "Hello"},
-		{Role: "assistant", Content: "Hi there!"},
-	}
+	messages := make([]Message, 0, 3)
+	messages = append(messages,
+		Message{Role: "system", Content: "You are helpful."},
+		Message{Role: "user", Content: "Hello"},
+		Message{Role: "assistant", Content: "Hi there!"},
+	)
 
 	result := toOpenAIMessages(messages)
 
@@ -195,17 +203,18 @@ func TestToOpenAIMessages(t *testing.T) {
 }
 
 func TestToOpenAIMessagesWithToolCalls(t *testing.T) {
-	messages := []Message{
-		{Role: "user", Content: "What's the weather?"},
-		{
+	messages := make([]Message, 0, 3)
+	messages = append(messages,
+		Message{Role: "user", Content: "What's the weather?"},
+		Message{
 			Role:    "assistant",
 			Content: "",
 			ToolCalls: []ToolCall{
 				{ID: "call_123", Name: "get_weather", Arguments: json.RawMessage(`{"location":"NYC"}`)},
 			},
 		},
-		{Role: "tool", Content: `{"temp": 72}`, ToolCallID: "call_123"},
-	}
+		Message{Role: "tool", Content: `{"temp": 72}`, ToolCallID: "call_123"},
+	)
 
 	result := toOpenAIMessages(messages)
 
@@ -239,7 +248,8 @@ func TestMockProviderChatWithTools(t *testing.T) {
 	mock := NewMock("test", "thinking...").WithToolCalls(toolCalls)
 
 	ctx := context.Background()
-	messages := []Message{{Role: "user", Content: "Do something"}}
+	messages := make([]Message, 0, 1)
+	messages = append(messages, Message{Role: "user", Content: "Do something"})
 	tools := []Tool{{Name: "test_tool", Description: "A test tool"}}
 
 	resp, err := mock.ChatWithTools(ctx, messages, tools)
@@ -263,7 +273,8 @@ func TestMockProviderChatWithToolsError(t *testing.T) {
 	mock := NewMock("test", "").WithChatError(expectedErr)
 
 	ctx := context.Background()
-	messages := []Message{{Role: "user", Content: "Do something"}}
+	messages := make([]Message, 0, 1)
+	messages = append(messages, Message{Role: "user", Content: "Do something"})
 	tools := []Tool{{Name: "test_tool", Description: "A test tool"}}
 
 	_, err := mock.ChatWithTools(ctx, messages, tools)
@@ -276,7 +287,8 @@ func TestMockProviderWithResponse(t *testing.T) {
 	mock := NewMock("test", "initial")
 
 	ctx := context.Background()
-	messages := []Message{{Role: "user", Content: "Hi"}}
+	messages := make([]Message, 0, 1)
+	messages = append(messages, Message{Role: "user", Content: "Hi"})
 
 	// Initial response
 	resp, _ := mock.Chat(ctx, messages)
@@ -297,7 +309,8 @@ func TestMockProviderWithReasoning(t *testing.T) {
 	mock := NewMock("test", "response").WithReasoning(reasoning)
 
 	ctx := context.Background()
-	messages := []Message{{Role: "user", Content: "Hi"}}
+	messages := make([]Message, 0, 1)
+	messages = append(messages, Message{Role: "user", Content: "Hi"})
 	tools := []Tool{{Name: "test_tool", Description: "A test tool"}}
 
 	resp, err := mock.ChatWithTools(ctx, messages, tools)
@@ -312,13 +325,14 @@ func TestMockProviderWithReasoning(t *testing.T) {
 func TestMockProviderConcurrentAccess(t *testing.T) {
 	mock := NewMock("test", "response")
 	ctx := context.Background()
-	messages := []Message{{Role: "user", Content: "Hi"}}
+	messages := make([]Message, 0, 1)
+	messages = append(messages, Message{Role: "user", Content: "Hi"})
 
 	// Run concurrent reads and writes
 	done := make(chan bool)
 	for i := 0; i < 10; i++ {
 		go func() {
-			mock.Chat(ctx, messages)
+			_, _ = mock.Chat(ctx, messages)
 			done <- true
 		}()
 		go func() {
@@ -341,16 +355,15 @@ func TestToOpenAIMessagesEmpty(t *testing.T) {
 }
 
 func TestToOpenAIMessagesMultipleToolCalls(t *testing.T) {
-	messages := []Message{
-		{
-			Role:    "assistant",
-			Content: "",
-			ToolCalls: []ToolCall{
-				{ID: "call_1", Name: "tool_a", Arguments: json.RawMessage(`{"a":1}`)},
-				{ID: "call_2", Name: "tool_b", Arguments: json.RawMessage(`{"b":2}`)},
-			},
+	messages := make([]Message, 0, 1)
+	messages = append(messages, Message{
+		Role:    "assistant",
+		Content: "",
+		ToolCalls: []ToolCall{
+			{ID: "call_1", Name: "tool_a", Arguments: json.RawMessage(`{"a":1}`)},
+			{ID: "call_2", Name: "tool_b", Arguments: json.RawMessage(`{"b":2}`)},
 		},
-	}
+	})
 
 	result := toOpenAIMessages(messages)
 
@@ -366,7 +379,8 @@ func TestToOpenAIMessagesMultipleToolCalls(t *testing.T) {
 }
 
 func TestToOllamaMessagesSerializesEmptyContent(t *testing.T) {
-	messages := []Message{{Role: "assistant", Content: ""}}
+	messages := make([]Message, 0, 1)
+	messages = append(messages, Message{Role: "assistant", Content: ""})
 
 	result := toOllamaMessages(messages)
 	if len(result) != 1 {
@@ -411,7 +425,8 @@ func TestRegistry_MultipleProvidersWithSameFactory(t *testing.T) {
 
 	// Verify correct responses
 	ctx := context.Background()
-	messages := []Message{{Role: "user", Content: "Hi"}}
+	messages := make([]Message, 0, 1)
+	messages = append(messages, Message{Role: "user", Content: "Hi"})
 
 	resp1, err := p1.Chat(ctx, messages)
 	if err != nil {
@@ -444,7 +459,8 @@ func TestRegistry_ConfigKeyOverridesFactoryName(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	messages := []Message{{Role: "user", Content: "Hi"}}
+	messages := make([]Message, 0, 1)
+	messages = append(messages, Message{Role: "user", Content: "Hi"})
 	resp, err := p.Chat(ctx, messages)
 	if err != nil {
 		t.Fatalf("Chat() error: %v", err)

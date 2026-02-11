@@ -14,3 +14,5 @@ Keep documentation concise and factual. No documentation file should be more tha
 - The app config is in `./config.toml`.
 - `cmd/main.go` is the orchestrator and entrypoint. It can then run in interactive mode with TUI or non-interactive mode with cli.
 - Project has a strict rule of separation of concerns. Shared functionality and data access is shared no matter what display mode the app is using. Ex: `llm/loop.go` is one core functionaly shared by both displays.
+- Makefile commands: `lint`, `test`, `run`, `build`. Always prefer these to lint, test, run and build the app.
+- Linter: golangci-lint with strict config. Must pass with 0 issues.

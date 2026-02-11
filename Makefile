@@ -1,4 +1,4 @@
-.PHONY: fmt build run test test-integration install clean db-reset-accounts check-upstream-version mcp_client backup-credentials
+.PHONY: fmt build run test lint install clean backup-credentials
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 LDFLAGS := -ldflags "-X main.Version=$(VERSION)"
@@ -24,6 +24,13 @@ test:
 	@echo ""
 	@echo "package coverage:"
 	@go tool cover -func=coverage.out | grep "^total:"
+
+lint:
+	@if ! command -v golangci-lint >/dev/null 2>&1; then \
+		echo "Installing golangci-lint..."; \
+		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $$(go env GOPATH)/bin latest; \
+	fi
+	$$(go env GOPATH)/bin/golangci-lint run ./...
 
 clean:
 	rm -rf bin/ coverage.out

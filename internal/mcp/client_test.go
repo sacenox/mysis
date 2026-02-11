@@ -12,9 +12,10 @@ import (
 func TestClientInitialize(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var req Request
-		json.NewDecoder(r.Body).Decode(&req)
+		_ = json.NewDecoder(r.Body).Decode(&req)
 
-		if req.Method == "initialize" {
+		switch req.Method {
+		case "initialize":
 			result := map[string]interface{}{
 				"protocolVersion": "2024-11-05",
 				"capabilities":    map[string]interface{}{},
@@ -26,12 +27,12 @@ func TestClientInitialize(t *testing.T) {
 				ID:      req.ID,
 				Result:  data,
 			}
-			json.NewEncoder(w).Encode(resp)
-		} else if req.Method == "notifications/initialized" {
+			_ = json.NewEncoder(w).Encode(resp)
+		case "notifications/initialized":
 			w.WriteHeader(http.StatusNoContent)
-		} else {
+		default:
 			resp := NewErrorResponse(req.ID, 0, "not implemented")
-			json.NewEncoder(w).Encode(resp)
+			_ = json.NewEncoder(w).Encode(resp)
 		}
 	}))
 	defer server.Close()
@@ -47,7 +48,7 @@ func TestClientNotify(t *testing.T) {
 	received := false
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var req Request
-		json.NewDecoder(r.Body).Decode(&req)
+		_ = json.NewDecoder(r.Body).Decode(&req)
 		if req.Method == "notifications/initialized" {
 			received = true
 		}
@@ -105,16 +106,16 @@ func TestClientParseSSEResponseLargePayload(t *testing.T) {
 func TestClientCallToolErrorReturnsToolResult(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var req Request
-		json.NewDecoder(r.Body).Decode(&req)
+		_ = json.NewDecoder(r.Body).Decode(&req)
 
 		if req.Method != "tools/call" {
 			resp := NewErrorResponse(req.ID, 0, "unexpected method")
-			json.NewEncoder(w).Encode(resp)
+			_ = json.NewEncoder(w).Encode(resp)
 			return
 		}
 
 		resp := NewErrorResponse(req.ID, 42, "insufficient_items: Not enough Iron Ore")
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer server.Close()
 
@@ -159,9 +160,10 @@ func TestClientInitializeRetry(t *testing.T) {
 
 		// Succeed on second attempt
 		var req Request
-		json.NewDecoder(r.Body).Decode(&req)
+		_ = json.NewDecoder(r.Body).Decode(&req)
 
-		if req.Method == "initialize" {
+		switch req.Method {
+		case "initialize":
 			result := map[string]interface{}{
 				"protocolVersion": "2024-11-05",
 				"capabilities":    map[string]interface{}{},
@@ -173,8 +175,8 @@ func TestClientInitializeRetry(t *testing.T) {
 				ID:      req.ID,
 				Result:  data,
 			}
-			json.NewEncoder(w).Encode(resp)
-		} else if req.Method == "notifications/initialized" {
+			_ = json.NewEncoder(w).Encode(resp)
+		case "notifications/initialized":
 			w.WriteHeader(http.StatusNoContent)
 		}
 	}))

@@ -234,8 +234,6 @@ func (p *OpenCodeProvider) createChatCompletion(ctx context.Context, req openai.
 			lastErr = err
 			continue // Network error - retry
 		}
-		defer resp.Body.Close()
-
 		log.Debug().
 			Str("provider", p.name).
 			Str("url", url).
@@ -247,6 +245,9 @@ func (p *OpenCodeProvider) createChatCompletion(ctx context.Context, req openai.
 		if resp.StatusCode == 429 || resp.StatusCode == 500 || resp.StatusCode == 502 ||
 			resp.StatusCode == 503 || resp.StatusCode == 504 {
 			payload, _ := io.ReadAll(resp.Body)
+			if err := resp.Body.Close(); err != nil {
+				log.Warn().Err(err).Msg("Failed to close response body")
+			}
 			lastErr = fmt.Errorf("chat completion status %d: %s", resp.StatusCode, strings.TrimSpace(string(payload)))
 
 			log.Warn().
@@ -256,13 +257,15 @@ func (p *OpenCodeProvider) createChatCompletion(ctx context.Context, req openai.
 				Str("body", string(payload)).
 				Msg("OpenCode retryable error")
 
-			resp.Body.Close()
 			continue // Retry on transient server errors and rate limits
 		}
 
 		// Non-retryable client error (4xx except 429)
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 			payload, _ := io.ReadAll(resp.Body)
+			if err := resp.Body.Close(); err != nil {
+				log.Warn().Err(err).Msg("Failed to close response body")
+			}
 			log.Error().
 				Str("provider", p.name).
 				Int("status", resp.StatusCode).
@@ -273,6 +276,9 @@ func (p *OpenCodeProvider) createChatCompletion(ctx context.Context, req openai.
 
 		// Success - read and decode body
 		bodyBytes, err := io.ReadAll(resp.Body)
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			log.Warn().Err(closeErr).Msg("Failed to close response body")
+		}
 		if err != nil {
 			log.Error().
 				Str("provider", p.name).
@@ -338,7 +344,11 @@ func (p *OpenCodeProvider) Stream(ctx context.Context, messages []Message) (<-ch
 	ch := make(chan StreamChunk)
 	go func() {
 		defer close(ch)
-		defer stream.Close()
+		defer func() {
+			if err := stream.Close(); err != nil {
+				log.Warn().Err(err).Msg("Failed to close stream")
+			}
+		}()
 
 		for {
 			resp, err := stream.Recv()
