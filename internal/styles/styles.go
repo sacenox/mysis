@@ -28,7 +28,7 @@ var (
 	// Role colors
 	ColorUser      = ColorTeal
 	ColorAssistant = ColorTealDim
-	ColorSystem    = ColorTealDim
+	ColorSystem    = ColorBorder
 	ColorTool      = ColorBrandDim
 )
 

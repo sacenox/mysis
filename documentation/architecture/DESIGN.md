@@ -24,7 +24,7 @@ A fully featured agentic interface for Spacemolt, themed like a mysis from [Zoea
 - `-p` `--p` for a provider from the config. If param is not there use default from config. If there is no config exit with error
 - Session management `-s`
 - Launches with cli by default `-t` for TUI display
-- `-f` specifies markdown file to use as system prompt
+- `-f` specifies markdown file to use as system prompt. Otherwise fallback to `prompt.md` in the internal/llm packahe ** INCOMPLETE **
 
 **MCP tools:**
 

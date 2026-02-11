@@ -35,6 +35,7 @@ Would you like me to scan nearby players or deploy drones before finishing?
   Error: Session not initialized
 ```
 
+- Print welcome to the TUI on start
 - Blinking cursor in TUI
 - Mouse selection in TUI
 - User messages no visible in TUI
